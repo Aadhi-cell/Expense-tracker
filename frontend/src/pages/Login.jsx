@@ -4,7 +4,7 @@ import api from '../api/axios';
 import { Wallet } from 'lucide-react';
 
 const Login = () => {
-  const [isRegister, setIsRegister] = useState(true);
+  const [isRegister, setIsRegister] = useState(false);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
