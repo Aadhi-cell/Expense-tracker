@@ -57,8 +57,14 @@ const Login = () => {
         navigate('/');
       }
     } catch (err) {
-      setError(err.response?.data?.detail || (isRegister ? 'Failed to create account' : 'Incorrect email or password'));
+      console.error("Auth error:", err);
+      const msg = err.response?.data?.detail || 
+        (!err.response || err.message === 'Network Error' 
+          ? 'Cannot reach backend server. Please wait 15 seconds and try again.' 
+          : (isRegister ? 'Failed to create account' : 'Incorrect email or password'));
+      setError(msg);
     } finally {
+
       setLoading(false);
     }
   };

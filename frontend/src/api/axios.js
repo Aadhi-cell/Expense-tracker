@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-const rawBaseURL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const rawBaseURL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://expense-tracker-s88j.onrender.com' : 'http://127.0.0.1:8000');
 const apiBaseURL = rawBaseURL.endsWith('/api') ? rawBaseURL : `${rawBaseURL.replace(/\/$/, '')}/api`;
+
 
 const api = axios.create({
   baseURL: apiBaseURL,
