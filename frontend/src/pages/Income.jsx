@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import { Plus, Trash2, Edit2, Search, X, DollarSign, Calendar, RefreshCw, Briefcase, TrendingUp } from 'lucide-react';
 
 const Income = () => {
+  const location = useLocation();
   const [incomes, setIncomes] = useState([]);
   const [summary, setSummary] = useState({
     monthly_income: 0,
@@ -75,6 +77,13 @@ const Income = () => {
     });
     setIsModalOpen(true);
   };
+
+  useEffect(() => {
+    if (location.state?.openModal) {
+      openAddModal();
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const openEditModal = (income) => {
     setEditingIncome(income);

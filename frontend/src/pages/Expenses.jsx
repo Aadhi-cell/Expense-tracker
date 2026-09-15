@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import {
   Plus, Trash2, Edit2, Search, X, Zap, Send,
-  AlertTriangle, Filter, Calendar, CreditCard, Tag, Store, FileText, CheckCircle2
+  AlertTriangle, Filter, Calendar, CreditCard, Tag, Store, FileText, CheckCircle2, Sparkles
 } from 'lucide-react';
 
 const Expenses = () => {
+  const location = useLocation();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -178,6 +180,13 @@ const Expenses = () => {
     });
     setIsModalOpen(true);
   };
+
+  useEffect(() => {
+    if (location.state?.openModal) {
+      openAddModal();
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const openEditModal = (expense) => {
     setEditingExpense(expense);

@@ -144,6 +144,7 @@ const Dashboard = () => {
           <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
             <Link
               to="/income"
+              state={{ openModal: true }}
               className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs sm:text-sm rounded-xl transition-colors text-center"
             >
               <Plus className="h-4 w-4" />
@@ -151,6 +152,7 @@ const Dashboard = () => {
             </Link>
             <Link
               to="/expenses"
+              state={{ openModal: true }}
               className="flex items-center justify-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all text-center"
             >
               <Plus className="h-4 w-4" />
