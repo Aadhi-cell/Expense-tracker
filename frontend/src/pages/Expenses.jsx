@@ -4,7 +4,7 @@ import api from '../api/axios';
 import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
 import {
   Plus, Trash2, Edit2, Search, X, Zap, Send,
-  AlertTriangle, Filter, Calendar, CreditCard, Tag, Store, FileText, CheckCircle2, Sparkles
+  AlertTriangle, CheckCircle2, Sparkles
 } from 'lucide-react';
 
 const Expenses = () => {
@@ -145,7 +145,7 @@ const Expenses = () => {
       } else {
         setAnomalyWarning(null);
       }
-    } catch (e) {
+    } catch {
       setAnomalyWarning(null);
     }
   };

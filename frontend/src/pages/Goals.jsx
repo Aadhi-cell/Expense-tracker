@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
-import { Target, Plus, Trash2, Edit2, CheckCircle2, TrendingUp, Calendar, X, Sparkles, Laptop, Plane, ShieldCheck, Bike, Gift } from 'lucide-react';
+import { Target, Plus, Trash2, Edit2, CheckCircle2, TrendingUp, Calendar, X, Laptop, Plane, ShieldCheck, Bike, Gift } from 'lucide-react';
 
 const Goals = () => {
   const [goals, setGoals] = useState([]);
@@ -144,7 +144,7 @@ const Goals = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Financial Goals</h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Set milestones, allocate savings, and watch your dreams become reality.</p>
         </div>
-        <button 
+        <button
           onClick={openAddModal}
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold text-sm rounded-xl shadow-xs hover:shadow transition-all"
         >
@@ -267,7 +267,7 @@ const Goals = () => {
 
                   {/* Progress bar */}
                   <div className="w-full bg-slate-100 h-2 sm:h-2.5 rounded-full overflow-hidden mb-1.5">
-                    <div 
+                    <div
                       className={`h-full transition-all duration-500 rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-primary-600'}`}
                       style={{ width: `${pct}%` }}
                     />
@@ -320,14 +320,14 @@ const Goals = () => {
               <h3 className="text-lg sm:text-xl font-bold text-slate-900">
                 {selectedGoal ? 'Edit Goal' : 'Create Financial Goal'}
               </h3>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSaveGoal} className="p-4 sm:p-5 space-y-3 sm:space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1">Goal Name</label>
@@ -405,14 +405,14 @@ const Goals = () => {
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900">Add Savings</h3>
                 <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">Contributing to {selectedGoal?.name}</p>
               </div>
-              <button 
+              <button
                 onClick={() => setIsContributeModalOpen(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleContribute} className="p-4 sm:p-5 space-y-3 sm:space-y-4">
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1">Amount to Add (₹)</label>

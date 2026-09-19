@@ -4,12 +4,12 @@ import api from '../api/axios';
 import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, Wallet, PiggyBank, Plus,
-  ArrowUpRight, AlertTriangle, CheckCircle2, AlertCircle,
-  Clock, Sparkles, ChevronRight, ShieldAlert, Edit2, X, Target
+  ArrowUpRight, AlertTriangle, AlertCircle,
+  ChevronRight, Edit2, X
 } from 'lucide-react';
 import MonthlyExpenseModal from '../components/MonthlyExpenseModal';
 
@@ -70,7 +70,7 @@ const Dashboard = () => {
     try {
       setSavingTargetLoading(true);
       const targetVal = parseFloat(targetInput) || 0;
-      await api.post('/dashboard/savings-target', { 
+      await api.post('/dashboard/savings-target', {
         target: targetVal,
         month: selectedMonth,
         year: selectedYear
@@ -120,8 +120,6 @@ const Dashboard = () => {
       { name: 'Month 2', expenses: data.monthly_expenses * 0.85, income: data.monthly_income, savings: 0 },
       { name: 'This Month', expenses: data.monthly_expenses, income: data.monthly_income, savings: data.savings_amount },
     ];
-
-  const savingsRate = data.savings_percentage || 0;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -269,11 +267,10 @@ const Dashboard = () => {
                 ₹{data.savings_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </p>
               {data.monthly_savings_target > 0 ? (
-                <span className={`text-[9px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full shrink-0 ${
-                  (data.this_month_savings !== undefined ? data.this_month_savings : data.savings_amount) >= data.monthly_savings_target
+                <span className={`text-[9px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full shrink-0 ${(data.this_month_savings !== undefined ? data.this_month_savings : data.savings_amount) >= data.monthly_savings_target
                     ? 'bg-emerald-50 text-emerald-700'
                     : 'bg-amber-50 text-amber-700'
-                }`}>
+                  }`}>
                   {(data.this_month_savings !== undefined ? data.this_month_savings : data.savings_amount) >= data.monthly_savings_target
                     ? '✓ Met'
                     : `${Math.round(((data.this_month_savings !== undefined ? data.this_month_savings : data.savings_amount) / data.monthly_savings_target) * 100)}%`}

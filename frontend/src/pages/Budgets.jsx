@@ -140,7 +140,6 @@ const Budgets = () => {
   // Summaries
   const totalBudgeted = budgets.reduce((sum, b) => sum + (b.amount || 0), 0);
   const totalSpent = budgets.reduce((sum, b) => sum + (b.spent_amount || 0), 0);
-  const overallPercentage = totalBudgeted > 0 ? Math.round((totalSpent / totalBudgeted) * 100) : 0;
   const warningsCount = budgets.filter(b => (b.percentage_used || 0) >= 75).length;
 
   return (

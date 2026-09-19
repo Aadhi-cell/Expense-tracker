@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database.connection import Base
@@ -7,7 +7,7 @@ class AIPrediction(Base):
     __tablename__ = "ai_predictions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     prediction_type = Column(String, nullable=False) # e.g. "next_month_expense"
     predicted_amount = Column(Float, nullable=False)
     target_month = Column(Integer, nullable=False)

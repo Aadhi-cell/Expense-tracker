@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import {
-  X, TrendingUp, TrendingDown, Calendar, CreditCard, Tag, 
-  AlertTriangle, AlertCircle, Search, ArrowUpRight, Flame, 
-  Wallet, Layers, Sparkles, Filter, ChevronRight, PiggyBank
+  X, TrendingUp, TrendingDown, Calendar, CreditCard, Tag,
+  AlertTriangle, AlertCircle, Search, ArrowUpRight, Flame,
+  Wallet, PiggyBank
 } from 'lucide-react';
 
 const CATEGORY_COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
   '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6', '#64748b'
 ];
 
@@ -49,7 +49,7 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
   const currentMonthName = months.find(m => m.value === selectedMonth)?.name || data?.month_name || `Month ${selectedMonth}`;
 
   const filteredTransactions = (data?.transactions || []).filter(tx => {
-    const matchesSearch = 
+    const matchesSearch =
       (tx.description && tx.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (tx.merchant && tx.merchant.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (tx.category && tx.category.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -60,7 +60,7 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
-      <div 
+      <div
         className="bg-white w-full max-w-5xl rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 flex flex-col max-h-[94vh] sm:max-h-[90vh] overflow-hidden my-0 sm:my-auto"
         onClick={(e) => e.stopPropagation()}
       >
@@ -164,7 +164,7 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
                           <span>₹{data.total_budget.toLocaleString('en-IN')} limit</span>
                         </div>
                         <div className="w-full bg-amber-200/50 h-1.5 rounded-full overflow-hidden">
-                          <div 
+                          <div
                             className={`h-full rounded-full ${data.budget_percentage > 100 ? 'bg-red-500' : 'bg-amber-500'}`}
                             style={{ width: `${Math.min(data.budget_percentage || 0, 100)}%` }}
                           />
@@ -190,8 +190,8 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
                     </p>
                     <div className="mt-1 flex items-center justify-between text-[10px] sm:text-xs">
                       <span className="text-slate-500 truncate mr-1">
-                        {data.monthly_savings > 0 
-                          ? `+₹${data.monthly_savings.toLocaleString('en-IN')} this month` 
+                        {data.monthly_savings > 0
+                          ? `+₹${data.monthly_savings.toLocaleString('en-IN')} this month`
                           : 'Not set this month'}
                       </span>
                       {data.cumulative_savings > (data.monthly_savings || 0) && (
@@ -260,8 +260,8 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
                           ₹{data.highest_spending_day.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                         <p className="text-[10px] sm:text-xs text-purple-600 mt-1 font-medium">
-                          {new Date(data.highest_spending_day.date).toLocaleDateString(undefined, { 
-                            weekday: 'short', month: 'short', day: 'numeric' 
+                          {new Date(data.highest_spending_day.date).toLocaleDateString(undefined, {
+                            weekday: 'short', month: 'short', day: 'numeric'
                           })}
                         </p>
                       </>
@@ -281,13 +281,12 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
                   </div>
                   <div className="flex flex-wrap gap-1.5 sm:gap-2">
                     {data.budget_alerts.map((alert, idx) => (
-                      <span 
+                      <span
                         key={idx}
-                        className={`text-[11px] sm:text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 ${
-                          alert.alert_level === 'exceeded' 
-                            ? 'bg-red-100 text-red-700 border border-red-200' 
+                        className={`text-[11px] sm:text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 ${alert.alert_level === 'exceeded'
+                            ? 'bg-red-100 text-red-700 border border-red-200'
                             : 'bg-amber-100 text-amber-800 border border-amber-200'
-                        }`}
+                          }`}
                       >
                         {alert.alert_level === 'exceeded' && <AlertCircle className="h-3 w-3 text-red-600 shrink-0" />}
                         {alert.category}: {alert.percentage_used}% used (₹{alert.spent_amount.toLocaleString('en-IN')} / ₹{alert.budget_amount.toLocaleString('en-IN')})
@@ -326,7 +325,7 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
                                 </span>
                               </div>
                               <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                <div 
+                                <div
                                   className="h-full rounded-full transition-all duration-300"
                                   style={{ width: `${item.percentage}%`, backgroundColor: color }}
                                 />
@@ -363,7 +362,7 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
                               </span>
                             </div>
                             <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                              <div 
+                              <div
                                 className="h-full bg-indigo-500 rounded-full transition-all duration-300"
                                 style={{ width: `${pm.percentage}%` }}
                               />
@@ -455,8 +454,8 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
                             <p className="font-semibold text-slate-800 text-xs truncate">{tx.description}</p>
                             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
                               <span>
-                                {new Date(tx.expense_date).toLocaleDateString(undefined, { 
-                                  month: 'short', day: 'numeric' 
+                                {new Date(tx.expense_date).toLocaleDateString(undefined, {
+                                  month: 'short', day: 'numeric'
                                 })}
                               </span>
                               <span>•</span>
@@ -490,8 +489,8 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
                           {filteredTransactions.map((tx) => (
                             <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
                               <td className="py-2.5 px-3 whitespace-nowrap text-slate-500">
-                                {new Date(tx.expense_date).toLocaleDateString(undefined, { 
-                                  month: 'short', day: 'numeric', year: 'numeric' 
+                                {new Date(tx.expense_date).toLocaleDateString(undefined, {
+                                  month: 'short', day: 'numeric', year: 'numeric'
                                 })}
                               </td>
                               <td className="py-2.5 px-3">

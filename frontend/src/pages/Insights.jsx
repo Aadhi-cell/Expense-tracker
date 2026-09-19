@@ -3,7 +3,7 @@ import api from '../api/axios';
 import { getCachedData, setCachedData } from '../utils/cache';
 import {
   TrendingUp, AlertTriangle,
-  ShieldCheck, ArrowRight, Lightbulb, Compass, BarChart3, RefreshCw
+  ShieldCheck, Lightbulb, Compass, BarChart3, RefreshCw
 } from 'lucide-react';
 
 const Insights = () => {
@@ -231,8 +231,8 @@ const Insights = () => {
             {/* Anomaly Result Card */}
             {anomalyResult && (
               <div className={`mt-4 p-4 rounded-xl border text-xs animate-in fade-in duration-150 ${anomalyResult.is_anomaly
-                  ? 'bg-red-50 border-red-200 text-red-900'
-                  : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                ? 'bg-red-50 border-red-200 text-red-900'
+                : 'bg-emerald-50 border-emerald-200 text-emerald-900'
                 }`}>
                 <div className="flex items-center gap-1.5 font-bold mb-1">
                   {anomalyResult.is_anomaly ? (

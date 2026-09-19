@@ -15,8 +15,8 @@ const api = axios.create({
 // Non-blocking pre-warm ping to wake up the cloud backend immediately
 export const prewarmBackend = () => {
   try {
-    fetch(`${rootBaseURL}/health`, { mode: 'cors' }).catch(() => {});
-  } catch (e) {
+    fetch(`${rootBaseURL}/health`, { mode: 'cors' }).catch(() => { });
+  } catch (_e) {
     // Ignore error for pre-warm
   }
 };

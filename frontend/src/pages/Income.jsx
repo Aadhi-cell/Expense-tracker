@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
-import { Plus, Trash2, Edit2, Search, X, DollarSign, Calendar, RefreshCw, Briefcase, TrendingUp } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, X, DollarSign, RefreshCw, TrendingUp } from 'lucide-react';
 
 const Income = () => {
   const location = useLocation();
@@ -145,8 +145,8 @@ const Income = () => {
   const filteredIncomes = incomes.filter(inc => {
     const matchesType = selectedType === 'All' || inc.income_type === selectedType;
     const matchesSearch = inc.source.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (inc.payment_method && inc.payment_method.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                          (inc.notes && inc.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+      (inc.payment_method && inc.payment_method.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (inc.notes && inc.notes.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesType && matchesSearch;
   });
 
@@ -157,7 +157,7 @@ const Income = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Income Management</h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Track your salary, freelance earnings, and multiple income streams.</p>
         </div>
-        <button 
+        <button
           onClick={openAddModal}
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl shadow-xs hover:shadow transition-all"
         >
@@ -203,9 +203,9 @@ const Income = () => {
       <div className="bg-white rounded-2xl shadow-xs border border-slate-100 overflow-hidden">
         <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col md:flex-row gap-3 justify-between items-stretch md:items-center bg-slate-50/50">
           <div className="relative w-full md:w-72">
-            <input 
-              type="text" 
-              placeholder="Search source or notes..." 
+            <input
+              type="text"
+              placeholder="Search source or notes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -216,9 +216,8 @@ const Income = () => {
           <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 no-scrollbar">
             <button
               onClick={() => setSelectedType('All')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium shrink-0 transition-colors ${
-                selectedType === 'All' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium shrink-0 transition-colors ${selectedType === 'All' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
             >
               All ({incomes.length})
             </button>
@@ -226,9 +225,8 @@ const Income = () => {
               <button
                 key={t}
                 onClick={() => setSelectedType(t)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                  selectedType === t ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${selectedType === t ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
               >
                 {t}
               </button>
@@ -291,14 +289,14 @@ const Income = () => {
                         +₹{income.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
-                        <button 
+                        <button
                           onClick={() => openEditModal(income)}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                           title="Edit"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDelete(income.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete"
@@ -382,14 +380,14 @@ const Income = () => {
               <h3 className="text-lg sm:text-xl font-bold text-slate-900">
                 {editingIncome ? 'Edit Income' : 'Add Income Stream'}
               </h3>
-              <button 
+              <button
                 onClick={handleModalClose}
                 className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSave} className="p-4 sm:p-5 space-y-3 sm:space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1">Amount (₹)</label>
