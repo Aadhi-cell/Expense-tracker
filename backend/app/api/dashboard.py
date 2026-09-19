@@ -44,6 +44,7 @@ def get_dashboard_summary(
     current_year = year if year is not None else now.year
 
     _, last_day = calendar.monthrange(current_year, current_month)
+    selected_month_start = date(current_year, current_month, 1)
     selected_month_end = date(current_year, current_month, last_day)
 
     # If viewing live current month, cutoff at today so future-dated income isn't counted in available cash yet!
@@ -51,11 +52,11 @@ def get_dashboard_summary(
     cutoff_date = now.date() if is_live_current_month else selected_month_end
 
     # --- EXPENSES ---
-    # Total expenses for selected month
+    # Total expenses for selected month (uses indexed date range)
     monthly_expenses = db.query(func.sum(Expense.amount)).filter(
         Expense.user_id == current_user.id,
-        extract('month', Expense.expense_date) == current_month,
-        extract('year', Expense.expense_date) == current_year
+        Expense.expense_date >= selected_month_start,
+        Expense.expense_date <= selected_month_end
     ).scalar() or 0.0
 
     # Total expenses up to cutoff date
@@ -65,11 +66,11 @@ def get_dashboard_summary(
     ).scalar() or 0.0
 
     # --- INCOMES ---
-    # Monthly income for selected month
+    # Monthly income for selected month (uses indexed date range)
     monthly_income = db.query(func.sum(Income.amount)).filter(
         Income.user_id == current_user.id,
-        extract('month', Income.income_date) == current_month,
-        extract('year', Income.income_date) == current_year
+        Income.income_date >= selected_month_start,
+        Income.income_date <= selected_month_end
     ).scalar() or 0.0
 
     # Total income up to cutoff date (excludes future income until reached!)
@@ -110,32 +111,30 @@ def get_dashboard_summary(
         Expense.category, func.sum(Expense.amount).label("total")
     ).filter(
         Expense.user_id == current_user.id,
-        extract('month', Expense.expense_date) == current_month,
-        extract('year', Expense.expense_date) == current_year
+        Expense.expense_date >= selected_month_start,
+        Expense.expense_date <= selected_month_end
     ).group_by(Expense.category).all()
     
     category_data = [{"category": cat, "amount": float(amount)} for cat, amount in category_expenses]
 
-    # Recent transactions (expenses + incomes combined, or recent expenses)
+    # Recent transactions
     recent_transactions = db.query(Expense).filter(
         Expense.user_id == current_user.id
     ).order_by(Expense.expense_date.desc(), Expense.id.desc()).limit(6).all()
 
-    # Budget status with warning levels
+    # Budget status with warning levels - calculated in memory to eliminate N database queries!
     budgets = db.query(Budget).filter(
         Budget.user_id == current_user.id,
         Budget.month == current_month,
         Budget.year == current_year
     ).all()
     
+    cat_spent_map = {str(cat).strip().lower(): float(amount) for cat, amount in category_expenses if cat}
     budget_status = []
     for budget in budgets:
-        spent = db.query(func.sum(Expense.amount)).filter(
-            Expense.user_id == current_user.id,
-            get_category_filter(budget.category_name),
-            extract('month', Expense.expense_date) == current_month,
-            extract('year', Expense.expense_date) == current_year
-        ).scalar() or 0.0
+        cat_lower = budget.category_name.strip().lower()
+        aliases = CATEGORY_ALIASES.get(cat_lower, [cat_lower])
+        spent = sum(cat_spent_map.get(a, 0.0) for a in aliases)
 
         pct = round((spent / budget.amount) * 100, 1) if budget.amount > 0 else 0
         if pct >= 100:
@@ -158,7 +157,32 @@ def get_dashboard_summary(
         })
 
     # Historical monthly trends (past 6 months ending at selected month)
+    # Optimized: 2 single group_by queries instead of 12 sequential queries!
     selected_target = datetime(current_year, current_month, 1)
+    oldest_month_date = (selected_target - relativedelta(months=5)).date()
+
+    exp_trends = db.query(
+        extract('year', Expense.expense_date).label('yr'),
+        extract('month', Expense.expense_date).label('mo'),
+        func.sum(Expense.amount).label('total')
+    ).filter(
+        Expense.user_id == current_user.id,
+        Expense.expense_date >= oldest_month_date,
+        Expense.expense_date <= selected_month_end
+    ).group_by('yr', 'mo').all()
+    exp_map = {(int(r.yr), int(r.mo)): float(r.total) for r in exp_trends}
+
+    inc_trends = db.query(
+        extract('year', Income.income_date).label('yr'),
+        extract('month', Income.income_date).label('mo'),
+        func.sum(Income.amount).label('total')
+    ).filter(
+        Income.user_id == current_user.id,
+        Income.income_date >= oldest_month_date,
+        Income.income_date <= selected_month_end
+    ).group_by('yr', 'mo').all()
+    inc_map = {(int(r.yr), int(r.mo)): float(r.total) for r in inc_trends}
+
     monthly_trends = []
     for i in range(5, -1, -1):
         target_date = selected_target - relativedelta(months=i)
@@ -166,17 +190,8 @@ def get_dashboard_summary(
         t_y = target_date.year
         month_label = target_date.strftime("%b %Y")
 
-        exp = db.query(func.sum(Expense.amount)).filter(
-            Expense.user_id == current_user.id,
-            extract('month', Expense.expense_date) == t_m,
-            extract('year', Expense.expense_date) == t_y
-        ).scalar() or 0.0
-
-        inc = db.query(func.sum(Income.amount)).filter(
-            Income.user_id == current_user.id,
-            extract('month', Income.income_date) == t_m,
-            extract('year', Income.income_date) == t_y
-        ).scalar() or 0.0
+        exp = exp_map.get((t_y, t_m), 0.0)
+        inc = inc_map.get((t_y, t_m), 0.0)
 
         monthly_trends.append({
             "name": month_label,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../api/axios';
+import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
 import {
   Plus, Trash2, Edit2, Search, X, Zap, Send,
   AlertTriangle, Filter, Calendar, CreditCard, Tag, Store, FileText, CheckCircle2, Sparkles
@@ -58,10 +59,19 @@ const Expenses = () => {
   const paymentMethods = ['Credit Card', 'Debit Card', 'Cash', 'UPI', 'Net Banking', 'Other'];
 
   const fetchExpenses = async () => {
-    try {
+    const cacheKey = 'expenses_list';
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      setExpenses(cached);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+
+    try {
       const response = await api.get('/expenses/');
       setExpenses(response.data);
+      setCachedData(cacheKey, response.data, 180);
     } catch (error) {
       console.error("Failed to fetch expenses", error);
     } finally {
@@ -106,6 +116,8 @@ const Expenses = () => {
         merchant: nlResult.merchant || '',
         notes: 'Added via Quick Entry'
       });
+      invalidateCache('expenses');
+      invalidateCache('dashboard');
       setNlResult(null);
       setNlText('');
       setAnomalyWarning(null);
@@ -115,6 +127,7 @@ const Expenses = () => {
       alert("Failed to save expense.");
     }
   };
+
 
   // Check Anomaly when amount/category changes
   const checkAnomaly = async (amount, category) => {
@@ -158,12 +171,15 @@ const Expenses = () => {
     if (window.confirm('Are you sure you want to delete this expense?')) {
       try {
         await api.delete(`/expenses/${id}`);
+        invalidateCache('expenses');
+        invalidateCache('dashboard');
         setExpenses(expenses.filter(e => e.id !== id));
       } catch (error) {
         console.error("Failed to delete expense", error);
       }
     }
   };
+
 
   const openAddModal = () => {
     setEditingExpense(null);
@@ -223,6 +239,8 @@ const Expenses = () => {
       } else {
         await api.post('/expenses/', payload);
       }
+      invalidateCache('expenses');
+      invalidateCache('dashboard');
       handleModalClose();
       fetchExpenses();
     } catch (error) {

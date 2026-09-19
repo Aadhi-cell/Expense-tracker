@@ -1,0 +1,22 @@
+name: Keep Render Backend Alive
+
+on:
+  schedule:
+    # Runs every 10 minutes (at */10 minutes past the hour)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Live Backend Health Check
+        run: |
+          echo "Pinging live Render backend to prevent sleep mode..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://expense-tracker-s88j.onrender.com/health)
+          echo "Response code: $STATUS"
+          if [ "$STATUS" -eq 200 ]; then
+            echo "✅ Live backend is awake and responding!"
+          else
+            echo "⚠️ Backend responded with $STATUS (or still waking up)"
+          fi

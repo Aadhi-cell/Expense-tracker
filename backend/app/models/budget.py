@@ -7,12 +7,12 @@ class Budget(Base):
     __tablename__ = "budgets"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     category_name = Column(String, nullable=False)
     amount = Column(Float, nullable=False)
-    month = Column(Integer, nullable=False) # 1-12
-    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False, index=True) # 1-12
+    year = Column(Integer, nullable=False, index=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

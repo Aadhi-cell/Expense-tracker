@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
+import { getCachedData, setCachedData } from '../utils/cache';
 import {
   TrendingUp, AlertTriangle,
   ShieldCheck, ArrowRight, Lightbulb, Compass, BarChart3, RefreshCw
@@ -22,14 +23,27 @@ const Insights = () => {
   ];
 
   const fetchInsightsData = async () => {
-    try {
+    const cachedInsights = getCachedData('insights_data');
+    const cachedPrediction = getCachedData('insights_prediction');
+    if (cachedInsights && cachedPrediction) {
+      setInsights(cachedInsights);
+      setPrediction(cachedPrediction);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+
+    try {
       const [insightsRes, predictionRes] = await Promise.all([
         api.get('/ai/insights'),
         api.post('/ai/predict-expenses')
       ]);
-      setInsights(insightsRes.data.insights || []);
-      setPrediction(predictionRes.data);
+      const insData = insightsRes.data.insights || [];
+      const predData = predictionRes.data;
+      setInsights(insData);
+      setPrediction(predData);
+      setCachedData('insights_data', insData, 300);
+      setCachedData('insights_prediction', predData, 300);
     } catch (error) {
       console.error("Failed to fetch insights", error);
     } finally {
@@ -40,6 +54,7 @@ const Insights = () => {
   useEffect(() => {
     fetchInsightsData();
   }, []);
+
 
   const handleTestAnomaly = async (e) => {
     e.preventDefault();

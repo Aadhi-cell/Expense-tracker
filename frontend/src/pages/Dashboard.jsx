@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
+import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -40,9 +41,19 @@ const Dashboard = () => {
   const [isExpenseDetailsModalOpen, setIsExpenseDetailsModalOpen] = useState(false);
 
   const fetchDashboard = async (m = selectedMonth, y = selectedYear) => {
+    const cacheKey = `dashboard_${m}_${y}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const response = await api.get(`/dashboard/?month=${m}&year=${y}`);
       setData(response.data);
+      setCachedData(cacheKey, response.data, 180);
     } catch (error) {
       console.error("Failed to fetch dashboard data", error);
     } finally {
@@ -64,6 +75,7 @@ const Dashboard = () => {
         month: selectedMonth,
         year: selectedYear
       });
+      invalidateCache('dashboard');
       setIsSavingsModalOpen(false);
       fetchDashboard();
     } catch (error) {
@@ -73,6 +85,7 @@ const Dashboard = () => {
       setSavingTargetLoading(false);
     }
   };
+
 
   if (loading) {
     return (

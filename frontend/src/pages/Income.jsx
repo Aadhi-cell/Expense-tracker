@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../api/axios';
+import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
 import { Plus, Trash2, Edit2, Search, X, DollarSign, Calendar, RefreshCw, Briefcase, TrendingUp } from 'lucide-react';
 
 const Income = () => {
@@ -33,14 +34,25 @@ const Income = () => {
   const paymentMethods = ['Bank Transfer', 'UPI', 'Cash', 'Cheque', 'Other'];
 
   const fetchIncomeData = async () => {
-    try {
+    const cachedIncomes = getCachedData('incomes_list');
+    const cachedSummary = getCachedData('incomes_summary');
+    if (cachedIncomes && cachedSummary) {
+      setIncomes(cachedIncomes);
+      setSummary(cachedSummary);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+
+    try {
       const [incomesRes, summaryRes] = await Promise.all([
         api.get('/income/'),
         api.get('/income/summary')
       ]);
       setIncomes(incomesRes.data);
       setSummary(summaryRes.data);
+      setCachedData('incomes_list', incomesRes.data, 180);
+      setCachedData('incomes_summary', summaryRes.data, 180);
     } catch (error) {
       console.error("Failed to fetch income data", error);
     } finally {
@@ -56,8 +68,11 @@ const Income = () => {
     if (window.confirm('Are you sure you want to delete this income record?')) {
       try {
         await api.delete(`/income/${id}`);
+        invalidateCache('income');
+        invalidateCache('dashboard');
         fetchIncomeData();
       } catch (error) {
+
         console.error("Failed to delete income", error);
         alert("Could not delete income record.");
       }
@@ -117,6 +132,8 @@ const Income = () => {
       } else {
         await api.post('/income/', payload);
       }
+      invalidateCache('income');
+      invalidateCache('dashboard');
       handleModalClose();
       fetchIncomeData();
     } catch (error) {

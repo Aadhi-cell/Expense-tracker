@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
+import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
 import { Plus, Trash2, Edit2, AlertTriangle, CheckCircle2, AlertCircle, PieChart, ArrowUpRight, X } from 'lucide-react';
 
 const Budgets = () => {
@@ -46,10 +47,19 @@ const Budgets = () => {
   ];
 
   const fetchBudgets = async () => {
-    try {
+    const cacheKey = `budgets_${selectedMonth}_${selectedYear}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      setBudgets(cached);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+
+    try {
       const res = await api.get(`/budgets/?month=${selectedMonth}&year=${selectedYear}`);
       setBudgets(res.data);
+      setCachedData(cacheKey, res.data, 180);
     } catch (error) {
       console.error("Failed to fetch budgets", error);
     } finally {
@@ -65,12 +75,15 @@ const Budgets = () => {
     if (window.confirm('Are you sure you want to delete this budget?')) {
       try {
         await api.delete(`/budgets/${id}`);
+        invalidateCache('budgets');
+        invalidateCache('dashboard');
         setBudgets(budgets.filter(b => b.id !== id));
       } catch (error) {
         console.error("Failed to delete budget", error);
       }
     }
   };
+
 
   const openAddModal = () => {
     setEditingBudget(null);
@@ -114,6 +127,8 @@ const Budgets = () => {
       } else {
         await api.post('/budgets/', payload);
       }
+      invalidateCache('budgets');
+      invalidateCache('dashboard');
       handleModalClose();
       fetchBudgets();
     } catch (error) {

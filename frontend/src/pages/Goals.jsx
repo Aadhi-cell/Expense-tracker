@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
+import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
 import { Target, Plus, Trash2, Edit2, CheckCircle2, TrendingUp, Calendar, X, Sparkles, Laptop, Plane, ShieldCheck, Bike, Gift } from 'lucide-react';
 
 const Goals = () => {
@@ -20,10 +21,18 @@ const Goals = () => {
   });
 
   const fetchGoals = async () => {
-    try {
+    const cached = getCachedData('goals_list');
+    if (cached) {
+      setGoals(cached);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+
+    try {
       const res = await api.get('/goals/');
       setGoals(res.data);
+      setCachedData('goals_list', res.data, 180);
     } catch (error) {
       console.error("Failed to fetch financial goals", error);
     } finally {
@@ -39,12 +48,14 @@ const Goals = () => {
     if (window.confirm('Are you sure you want to delete this goal?')) {
       try {
         await api.delete(`/goals/${id}`);
+        invalidateCache('goals');
         setGoals(goals.filter(g => g.id !== id));
       } catch (error) {
         console.error("Failed to delete goal", error);
       }
     }
   };
+
 
   const openAddModal = () => {
     setSelectedGoal(null);
@@ -89,6 +100,7 @@ const Goals = () => {
       } else {
         await api.post('/goals/', payload);
       }
+      invalidateCache('goals');
       setIsModalOpen(false);
       fetchGoals();
     } catch (error) {
@@ -102,6 +114,7 @@ const Goals = () => {
     if (!selectedGoal || !contributionAmount) return;
     try {
       await api.post(`/goals/${selectedGoal.id}/contribute?amount=${parseFloat(contributionAmount)}`);
+      invalidateCache('goals');
       setIsContributeModalOpen(false);
       fetchGoals();
     } catch (error) {

@@ -114,19 +114,41 @@ SEED_DATA = [
     ("beauty parlour skincare", "Personal Care")
 ]
 
+_BASE_VECTORIZER = None
+_BASE_MODEL = None
+
+def get_base_classifier():
+    global _BASE_VECTORIZER, _BASE_MODEL
+    if _BASE_VECTORIZER is None or _BASE_MODEL is None:
+        texts = [item[0] for item in SEED_DATA]
+        labels = [item[1] for item in SEED_DATA]
+        vec = TfidfVectorizer(ngram_range=(1, 2), stop_words='english')
+        X = vec.fit_transform(texts)
+        clf = MultinomialNB()
+        clf.fit(X, labels)
+        _BASE_VECTORIZER = vec
+        _BASE_MODEL = clf
+    return _BASE_VECTORIZER, _BASE_MODEL
+
 def get_category_classifier(user_expenses: List[Expense] = None):
+    if not user_expenses:
+        return get_base_classifier()
+
     texts = [item[0] for item in SEED_DATA]
     labels = [item[1] for item in SEED_DATA]
 
-    # Include user's own historical descriptions if available
-    if user_expenses:
-        for exp in user_expenses:
-            if exp.description and exp.category:
-                texts.append(exp.description.lower())
+    has_custom = False
+    for exp in user_expenses:
+        if exp.description and exp.category:
+            texts.append(exp.description.lower())
+            labels.append(exp.category)
+            has_custom = True
+            if exp.merchant:
+                texts.append(f"{exp.description.lower()} {exp.merchant.lower()}")
                 labels.append(exp.category)
-                if exp.merchant:
-                    texts.append(f"{exp.description.lower()} {exp.merchant.lower()}")
-                    labels.append(exp.category)
+
+    if not has_custom:
+        return get_base_classifier()
 
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), stop_words='english')
     X = vectorizer.fit_transform(texts)
