@@ -69,6 +69,33 @@ def contribute_to_goal(
     db.refresh(db_goal)
     return db_goal
 
+@router.post("/{goal_id}/withdraw", response_model=GoalResponse)
+def withdraw_from_goal(
+    goal_id: int,
+    amount: float,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    db_goal = db.query(FinancialGoal).filter(FinancialGoal.id == goal_id, FinancialGoal.user_id == current_user.id).first()
+    if not db_goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Withdrawal amount must be positive")
+
+    current = db_goal.current_amount or 0.0
+    if amount > current:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot withdraw ₹{amount:,.2f}. Current saved amount is ₹{current:,.2f}."
+        )
+
+    db_goal.current_amount = max(0.0, current - amount)
+    db.add(db_goal)
+    db.commit()
+    db.refresh(db_goal)
+    return db_goal
+
 @router.delete("/{goal_id}")
 def delete_goal(
     goal_id: int,

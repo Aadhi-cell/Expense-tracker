@@ -9,7 +9,7 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet, PiggyBank, Plus,
   ArrowUpRight, AlertTriangle, AlertCircle,
-  ChevronRight, Edit2, X
+  ChevronRight, Edit2, X, Trash2
 } from 'lucide-react';
 import MonthlyExpenseModal from '../components/MonthlyExpenseModal';
 
@@ -76,11 +76,29 @@ const Dashboard = () => {
         year: selectedYear
       });
       invalidateCache('dashboard');
+      invalidateCache('monthly_expenses');
       setIsSavingsModalOpen(false);
-      fetchDashboard();
+      fetchDashboard(selectedMonth, selectedYear);
     } catch (error) {
       console.error("Failed to update savings target", error);
       alert("Failed to update monthly savings target");
+    } finally {
+      setSavingTargetLoading(false);
+    }
+  };
+
+  const handleRemoveSavingsTarget = async () => {
+    if (!window.confirm("Are you sure you want to remove the savings allocation for this month?")) return;
+    try {
+      setSavingTargetLoading(true);
+      await api.delete(`/dashboard/savings-target?month=${selectedMonth}&year=${selectedYear}`);
+      invalidateCache('dashboard');
+      invalidateCache('monthly_expenses');
+      setIsSavingsModalOpen(false);
+      fetchDashboard(selectedMonth, selectedYear);
+    } catch (error) {
+      console.error("Failed to remove savings target", error);
+      alert("Failed to remove monthly savings target");
     } finally {
       setSavingTargetLoading(false);
     }
@@ -256,6 +274,15 @@ const Dashboard = () => {
               >
                 <Edit2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               </button>
+              {data.this_month_savings > 0 && (
+                <button
+                  onClick={handleRemoveSavingsTarget}
+                  title="Remove savings for this month"
+                  className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                </button>
+              )}
               <div className="p-1.5 sm:p-2 bg-purple-50 text-purple-600 rounded-xl">
                 <PiggyBank className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
@@ -555,21 +582,37 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsSavingsModalOpen(false)}
-                  className="px-4 py-2 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingTargetLoading}
-                  className="px-5 py-2 text-xs sm:text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors shadow-xs disabled:opacity-50"
-                >
-                  {savingTargetLoading ? 'Saving...' : 'Save Target'}
-                </button>
+              <div className="pt-2 flex items-center justify-between gap-2">
+                {data.this_month_savings > 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleRemoveSavingsTarget}
+                    disabled={savingTargetLoading}
+                    className="px-3 py-2 text-xs sm:text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remove Savings
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSavingsModalOpen(false)}
+                    className="px-4 py-2 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingTargetLoading}
+                    className="px-5 py-2 text-xs sm:text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    {savingTargetLoading ? 'Saving...' : 'Save Target'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

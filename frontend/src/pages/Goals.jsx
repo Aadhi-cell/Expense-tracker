@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
-import { Target, Plus, Trash2, Edit2, CheckCircle2, TrendingUp, Calendar, X, Laptop, Plane, ShieldCheck, Bike, Gift } from 'lucide-react';
+import { Target, Plus, Minus, Trash2, Edit2, CheckCircle2, TrendingUp, Calendar, X, Laptop, Plane, ShieldCheck, Bike, Gift } from 'lucide-react';
 
 const Goals = () => {
   const [goals, setGoals] = useState([]);
@@ -10,6 +10,7 @@ const Goals = () => {
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isContributeModalOpen, setIsContributeModalOpen] = useState(false);
+  const [contributeMode, setContributeMode] = useState('add'); // 'add' or 'withdraw'
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [contributionAmount, setContributionAmount] = useState('');
 
@@ -79,8 +80,9 @@ const Goals = () => {
     setIsModalOpen(true);
   };
 
-  const openContributeModal = (goal) => {
+  const openContributeModal = (goal, mode = 'add') => {
     setSelectedGoal(goal);
+    setContributeMode(mode);
     setContributionAmount('');
     setIsContributeModalOpen(true);
   };
@@ -112,14 +114,30 @@ const Goals = () => {
   const handleContribute = async (e) => {
     e.preventDefault();
     if (!selectedGoal || !contributionAmount) return;
+    const amountNum = parseFloat(contributionAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      alert("Please enter a valid amount greater than 0");
+      return;
+    }
+
+    if (contributeMode === 'withdraw' && amountNum > (selectedGoal.current_amount || 0)) {
+      alert(`Cannot withdraw more than current savings (₹${(selectedGoal.current_amount || 0).toLocaleString('en-IN')})`);
+      return;
+    }
+
     try {
-      await api.post(`/goals/${selectedGoal.id}/contribute?amount=${parseFloat(contributionAmount)}`);
+      if (contributeMode === 'withdraw') {
+        await api.post(`/goals/${selectedGoal.id}/withdraw?amount=${amountNum}`);
+      } else {
+        await api.post(`/goals/${selectedGoal.id}/contribute?amount=${amountNum}`);
+      }
       invalidateCache('goals');
       setIsContributeModalOpen(false);
       fetchGoals();
     } catch (error) {
-      console.error("Failed to contribute to goal", error);
-      alert("Failed to add contribution.");
+      console.error(`Failed to ${contributeMode} savings`, error);
+      const msg = error.response?.data?.detail || `Failed to ${contributeMode === 'withdraw' ? 'withdraw' : 'add'} savings.`;
+      alert(msg);
     }
   };
 
@@ -279,15 +297,29 @@ const Goals = () => {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-50 flex items-center justify-between">
-                  <button
-                    onClick={() => openContributeModal(g)}
-                    disabled={isCompleted}
-                    className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Savings
-                  </button>
+                <div className="pt-3 border-t border-slate-50 flex items-center justify-between gap-1 sm:gap-2 flex-wrap">
+                  <div className="flex items-center gap-1 sm:gap-1.5">
+                    <button
+                      onClick={() => openContributeModal(g, 'add')}
+                      disabled={isCompleted}
+                      className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Add Savings"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Savings
+                    </button>
+
+                    {(g.current_amount || 0) > 0 && (
+                      <button
+                        onClick={() => openContributeModal(g, 'withdraw')}
+                        className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg transition-colors"
+                        title="Withdraw / Remove Savings"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                        Withdraw
+                      </button>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-1">
                     <button
@@ -396,51 +428,157 @@ const Goals = () => {
         </div>
       )}
 
-      {/* Contribute / Add Funds Modal */}
+      {/* Contribute / Add or Withdraw Funds Modal */}
       {isContributeModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center p-4 sm:p-5 border-b border-slate-100">
               <div>
-                <h3 className="text-lg sm:text-xl font-bold text-slate-900">Add Savings</h3>
-                <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">Contributing to {selectedGoal?.name}</p>
+                <h3 className="text-lg sm:text-xl font-bold text-slate-900">
+                  {contributeMode === 'withdraw' ? 'Withdraw Savings' : 'Add Savings'}
+                </h3>
+                <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                  {contributeMode === 'withdraw' ? 'Deducting from' : 'Contributing to'} {selectedGoal?.name}
+                </p>
               </div>
               <button
                 onClick={() => setIsContributeModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleContribute} className="p-4 sm:p-5 space-y-3 sm:space-y-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1">Amount to Add (₹)</label>
-                <input
-                  type="number"
-                  step="1"
-                  required
-                  autoFocus
-                  value={contributionAmount}
-                  onChange={(e) => setContributionAmount(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm font-bold"
-                  placeholder="e.g. 5000"
-                />
+            {/* Tab switch between Add and Withdraw */}
+            <div className="px-4 sm:px-5 pt-4">
+              <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => { setContributeMode('add'); setContributionAmount(''); }}
+                  className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    contributeMode === 'add'
+                      ? 'bg-white text-emerald-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Savings
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setContributeMode('withdraw'); setContributionAmount(''); }}
+                  className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    contributeMode === 'withdraw'
+                      ? 'bg-white text-rose-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                  Withdraw
+                </button>
               </div>
+            </div>
+
+            <form onSubmit={handleContribute} className="p-4 sm:p-5 pt-3 space-y-3 sm:space-y-4">
+              {/* Context Summary Banner */}
+              {contributeMode === 'withdraw' ? (
+                <div className="bg-rose-50/70 border border-rose-100 rounded-xl p-3 text-xs text-rose-800 flex justify-between items-center">
+                  <span className="font-medium">Currently Saved:</span>
+                  <span className="font-extrabold text-sm text-rose-900">
+                    ₹{(selectedGoal?.current_amount || 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              ) : (
+                <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-800 flex justify-between items-center">
+                  <span className="font-medium">Remaining to Goal:</span>
+                  <span className="font-extrabold text-sm text-emerald-900">
+                    ₹{Math.max(0, (selectedGoal?.target_amount || 0) - (selectedGoal?.current_amount || 0)).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1">
+                  {contributeMode === 'withdraw' ? 'Amount to Withdraw / Remove (₹)' : 'Amount to Add (₹)'}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400 font-bold">₹</span>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max={contributeMode === 'withdraw' ? (selectedGoal?.current_amount || 0) : undefined}
+                    required
+                    autoFocus
+                    value={contributionAmount}
+                    onChange={(e) => setContributionAmount(e.target.value)}
+                    className="w-full pl-8 pr-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm font-bold text-slate-800"
+                    placeholder="e.g. 1000"
+                  />
+                </div>
+              </div>
+
+              {/* Quick presets */}
+              {contributeMode === 'withdraw' ? (
+                <div>
+                  <span className="text-[11px] text-slate-400 block mb-1">Quick Withdraw:</span>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { label: '25%', frac: 0.25 },
+                      { label: '50%', frac: 0.5 },
+                      { label: '75%', frac: 0.75 },
+                      { label: 'All', frac: 1.0 }
+                    ].map(({ label, frac }) => {
+                      const val = Math.floor((selectedGoal?.current_amount || 0) * frac);
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          disabled={!selectedGoal?.current_amount || selectedGoal.current_amount <= 0}
+                          onClick={() => setContributionAmount(val.toString())}
+                          className="py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 border border-slate-200 transition-colors disabled:opacity-40 cursor-pointer"
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <span className="text-[11px] text-slate-400 block mb-1">Quick Add:</span>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[500, 1000, 2000, 5000].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setContributionAmount(amt.toString())}
+                        className="py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                      >
+                        +₹{amt >= 1000 ? `${amt / 1000}k` : amt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsContributeModalOpen(false)}
-                  className="px-4 py-2 text-xs sm:text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium rounded-xl transition-colors"
+                  className="px-4 py-2 text-xs sm:text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors shadow-xs"
+                  className={`px-5 py-2 text-xs sm:text-sm text-white font-semibold rounded-xl transition-colors shadow-xs cursor-pointer ${
+                    contributeMode === 'withdraw'
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
                 >
-                  Add Funds
+                  {contributeMode === 'withdraw' ? 'Withdraw Funds' : 'Add Funds'}
                 </button>
               </div>
             </form>

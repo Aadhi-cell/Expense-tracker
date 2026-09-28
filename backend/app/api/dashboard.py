@@ -452,7 +452,10 @@ def update_savings_target(
             MonthlySavings.month == target_in.month,
             MonthlySavings.year == target_in.year
         ).first()
-        if rec:
+        if target_val == 0.0:
+            if rec:
+                db.delete(rec)
+        elif rec:
             rec.amount = target_val
         else:
             rec = MonthlySavings(
@@ -469,3 +472,27 @@ def update_savings_target(
         "message": "Monthly savings target updated successfully",
         "monthly_savings_target": current_user.monthly_savings_target
     }
+
+@router.delete("/savings-target")
+def delete_savings_target(
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if month and year:
+        rec = db.query(MonthlySavings).filter(
+            MonthlySavings.user_id == current_user.id,
+            MonthlySavings.month == month,
+            MonthlySavings.year == year
+        ).first()
+        if rec:
+            db.delete(rec)
+            db.commit()
+    else:
+        current_user.monthly_savings_target = 0.0
+        db.add(current_user)
+        db.commit()
+
+    return {"message": "Monthly savings target removed successfully"}
+
