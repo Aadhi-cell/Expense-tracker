@@ -16,6 +16,7 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('All');
+  const [topSortOrder, setTopSortOrder] = useState('date'); // 'date' (latest date first) or 'amount' (largest amount first)
 
   useEffect(() => {
     if (!isOpen) return;
@@ -48,14 +49,27 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
 
   const currentMonthName = months.find(m => m.value === selectedMonth)?.name || data?.month_name || `Month ${selectedMonth}`;
 
-  const filteredTransactions = (data?.transactions || []).filter(tx => {
-    const matchesSearch =
-      (tx.description && tx.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (tx.merchant && tx.merchant.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (tx.category && tx.category.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredTransactions = (data?.transactions || [])
+    .filter(tx => {
+      const matchesSearch =
+        (tx.description && tx.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (tx.merchant && tx.merchant.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (tx.category && tx.category.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesCategory = activeCategoryFilter === 'All' || tx.category === activeCategoryFilter;
-    return matchesSearch && matchesCategory;
+      const matchesCategory = activeCategoryFilter === 'All' || tx.category === activeCategoryFilter;
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => new Date(b.expense_date) - new Date(a.expense_date) || b.id - a.id);
+
+  const sortedTopExpenses = [...(data?.top_expenses || [])].sort((a, b) => {
+    if (topSortOrder === 'date') {
+      const dateDiff = new Date(b.expense_date) - new Date(a.expense_date);
+      if (dateDiff !== 0) return dateDiff;
+      return b.amount - a.amount;
+    }
+    const amtDiff = b.amount - a.amount;
+    if (amtDiff !== 0) return amtDiff;
+    return new Date(b.expense_date) - new Date(a.expense_date);
   });
 
   return (
@@ -379,17 +393,43 @@ const MonthlyExpenseModal = ({ isOpen, onClose, selectedMonth, selectedYear, mon
                 {/* Top 5 High-Value Expenses */}
                 <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between md:col-span-2 lg:col-span-1">
                   <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
+                    <div className="flex items-center justify-between mb-3 gap-2">
+                      <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5 truncate">
                         <ArrowUpRight className="h-4 w-4 text-emerald-600 shrink-0" />
-                        Top 5 Largest Spends
+                        <span>Top 5 Largest Spends</span>
                       </h3>
-                      <span className="text-[11px] text-slate-400">Peak Purchases</span>
+                      {/* Sort by Date / Amount Toggle */}
+                      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg shrink-0 text-[10px] font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => setTopSortOrder('date')}
+                          className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                            topSortOrder === 'date'
+                              ? 'bg-white text-emerald-700 shadow-xs font-bold'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                          title="Order by date (newest first)"
+                        >
+                          Date ⬇
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTopSortOrder('amount')}
+                          className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                            topSortOrder === 'amount'
+                              ? 'bg-white text-emerald-700 shadow-xs font-bold'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                          title="Order by amount (highest first)"
+                        >
+                          Amount ⬇
+                        </button>
+                      </div>
                     </div>
 
-                    {data.top_expenses.length > 0 ? (
+                    {sortedTopExpenses.length > 0 ? (
                       <div className="divide-y divide-slate-100 max-h-56 overflow-y-auto pr-1">
-                        {data.top_expenses.map((top, idx) => (
+                        {sortedTopExpenses.map((top, idx) => (
                           <div key={top.id || idx} className="py-2 flex justify-between items-center text-xs">
                             <div className="truncate pr-2">
                               <p className="font-semibold text-slate-800 truncate">{top.description}</p>

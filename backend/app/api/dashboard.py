@@ -346,7 +346,8 @@ def get_monthly_expense_details(
         reverse=True
     )
 
-    # 7. Top 5 Largest Expenses
+    # 7. Top 5 Largest Expenses (sorted by date descending so dates appear chronologically)
+    top_5_largest = sorted(expenses, key=lambda x: (x.amount, x.expense_date), reverse=True)[:5]
     top_expenses = [
         {
             "id": exp.id,
@@ -358,7 +359,7 @@ def get_monthly_expense_details(
             "merchant": exp.merchant,
             "notes": exp.notes
         }
-        for exp in sorted(expenses, key=lambda x: x.amount, reverse=True)[:5]
+        for exp in sorted(top_5_largest, key=lambda x: (x.expense_date, x.amount), reverse=True)
     ]
 
     # 8. Budget Status & Total Budget Comparison
