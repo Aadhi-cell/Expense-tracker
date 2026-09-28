@@ -127,7 +127,17 @@ const Goals = () => {
 
     try {
       if (contributeMode === 'withdraw') {
-        await api.post(`/goals/${selectedGoal.id}/withdraw?amount=${amountNum}`);
+        try {
+          await api.post(`/goals/${selectedGoal.id}/withdraw?amount=${amountNum}`);
+        } catch (err) {
+          if (err.response?.status === 404 || err.response?.status === 405) {
+            // Graceful fallback while Render backend is redeploying
+            const newAmount = Math.max(0, (selectedGoal.current_amount || 0) - amountNum);
+            await api.put(`/goals/${selectedGoal.id}`, { current_amount: newAmount });
+          } else {
+            throw err;
+          }
+        }
       } else {
         await api.post(`/goals/${selectedGoal.id}/contribute?amount=${amountNum}`);
       }

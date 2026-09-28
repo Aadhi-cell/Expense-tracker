@@ -91,7 +91,14 @@ const Dashboard = () => {
     if (!window.confirm("Are you sure you want to remove the savings allocation for this month?")) return;
     try {
       setSavingTargetLoading(true);
-      await api.delete(`/dashboard/savings-target?month=${selectedMonth}&year=${selectedYear}`);
+      // Use POST with target: 0 for 100% live compatibility across all backend deployment versions
+      await api.post('/dashboard/savings-target', {
+        target: 0,
+        month: selectedMonth,
+        year: selectedYear
+      });
+      // Fire-and-forget DELETE cleanup for newer backend builds
+      api.delete(`/dashboard/savings-target?month=${selectedMonth}&year=${selectedYear}`).catch(() => {});
       invalidateCache('dashboard');
       invalidateCache('monthly_expenses');
       setIsSavingsModalOpen(false);
