@@ -1,11 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
-import { Plus, Trash2, Edit2, Search, X, DollarSign, RefreshCw, TrendingUp } from 'lucide-react';
+import { 
+  Plus, Trash2, Edit2, Search, X, DollarSign, RefreshCw, 
+  TrendingUp, Calendar, ChevronLeft, ChevronRight, Filter 
+} from 'lucide-react';
 
 const Income = () => {
   const location = useLocation();
+  const now = new Date();
+  const currentMonthNum = now.getMonth() + 1; // 1 to 12
+  const currentYearNum = now.getFullYear();
+
   const [incomes, setIncomes] = useState([]);
   const [summary, setSummary] = useState({
     monthly_income: 0,
@@ -14,6 +21,12 @@ const Income = () => {
     type_breakdown: []
   });
   const [loading, setLoading] = useState(true);
+
+  // Month & Year Filter States (Default to Current Month & Year)
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthNum); // 1-12 or 'ALL'
+  const [selectedYear, setSelectedYear] = useState(currentYearNum);
+
+  // Search & Type Filters
   const [selectedType, setSelectedType] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -25,13 +38,44 @@ const Income = () => {
     source: '',
     income_type: 'Salary',
     payment_method: 'Bank Transfer',
-    income_date: new Date().toISOString().split('T')[0],
+    income_date: now.toISOString().split('T')[0],
     is_recurring: false,
     notes: ''
   });
 
+  const months = [
+    { value: 1, name: 'January', short: 'Jan' },
+    { value: 2, name: 'February', short: 'Feb' },
+    { value: 3, name: 'March', short: 'Mar' },
+    { value: 4, name: 'April', short: 'Apr' },
+    { value: 5, name: 'May', short: 'May' },
+    { value: 6, name: 'June', short: 'Jun' },
+    { value: 7, name: 'July', short: 'Jul' },
+    { value: 8, name: 'August', short: 'Aug' },
+    { value: 9, name: 'September', short: 'Sep' },
+    { value: 10, name: 'October', short: 'Oct' },
+    { value: 11, name: 'November', short: 'Nov' },
+    { value: 12, name: 'December', short: 'Dec' },
+  ];
+
   const incomeTypes = ['Salary', 'Business', 'Freelance', 'Bonus', 'Other'];
   const paymentMethods = ['Bank Transfer', 'UPI', 'Cash', 'Cheque', 'Other'];
+
+  // Helper: parse date safely without timezone day-shift
+  const getIncomeDateParts = (dateStr) => {
+    if (!dateStr) return { year: 0, month: 0, day: 0 };
+    const clean = String(dateStr).split('T')[0];
+    const [y, m, d] = clean.split('-').map(Number);
+    return { year: y || 0, month: m || 0, day: d || 0 };
+  };
+
+  const formatDisplayDate = (dateStr) => {
+    if (!dateStr) return '';
+    const { year, month, day } = getIncomeDateParts(dateStr);
+    if (!year || !month || !day) return dateStr;
+    const monthShort = months.find(m => m.value === month)?.short || '';
+    return `${day} ${monthShort} ${year}`;
+  };
 
   const fetchIncomeData = async () => {
     const cachedIncomes = getCachedData('incomes_list');
@@ -64,6 +108,88 @@ const Income = () => {
     fetchIncomeData();
   }, []);
 
+  // Compute available months dynamically from income records + current month
+  const availableMonthOptions = useMemo(() => {
+    const map = new Map();
+
+    // Ensure current month is always present
+    const curKey = `${currentYearNum}-${String(currentMonthNum).padStart(2, '0')}`;
+    const curMonthObj = months.find(m => m.value === currentMonthNum);
+    map.set(curKey, {
+      key: curKey,
+      year: currentYearNum,
+      month: currentMonthNum,
+      name: curMonthObj ? curMonthObj.name : `Month ${currentMonthNum}`,
+      short: curMonthObj ? curMonthObj.short : `M${currentMonthNum}`,
+      total: 0,
+      count: 0
+    });
+
+    // Populate from all incomes
+    incomes.forEach(inc => {
+      const { year, month } = getIncomeDateParts(inc.income_date);
+      if (year && month) {
+        const key = `${year}-${String(month).padStart(2, '0')}`;
+        if (!map.has(key)) {
+          const mObj = months.find(m => m.value === month);
+          map.set(key, {
+            key,
+            year,
+            month,
+            name: mObj ? mObj.name : `Month ${month}`,
+            short: mObj ? mObj.short : `M${month}`,
+            total: 0,
+            count: 0
+          });
+        }
+        const entry = map.get(key);
+        entry.total += Number(inc.amount) || 0;
+        entry.count += 1;
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
+  }, [incomes, currentMonthNum, currentYearNum]);
+
+  // Available years for dropdown
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set([currentYearNum - 1, currentYearNum, currentYearNum + 1]);
+    incomes.forEach(inc => {
+      const { year } = getIncomeDateParts(inc.income_date);
+      if (year) yearsSet.add(year);
+    });
+    return Array.from(yearsSet).sort((a, b) => b - a);
+  }, [incomes, currentYearNum]);
+
+  // Prev / Next month navigation
+  const handlePrevMonth = () => {
+    if (selectedMonth === 'ALL') {
+      setSelectedMonth(currentMonthNum);
+      setSelectedYear(currentYearNum);
+      return;
+    }
+    if (selectedMonth === 1) {
+      setSelectedMonth(12);
+      setSelectedYear(prev => prev - 1);
+    } else {
+      setSelectedMonth(prev => prev - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 'ALL') {
+      setSelectedMonth(currentMonthNum);
+      setSelectedYear(currentYearNum);
+      return;
+    }
+    if (selectedMonth === 12) {
+      setSelectedMonth(1);
+      setSelectedYear(prev => prev + 1);
+    } else {
+      setSelectedMonth(prev => prev + 1);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this income record?')) {
       try {
@@ -72,7 +198,6 @@ const Income = () => {
         invalidateCache('dashboard');
         fetchIncomeData();
       } catch (error) {
-
         console.error("Failed to delete income", error);
         alert("Could not delete income record.");
       }
@@ -81,12 +206,21 @@ const Income = () => {
 
   const openAddModal = () => {
     setEditingIncome(null);
+    let defaultDate = now.toISOString().split('T')[0];
+    if (selectedMonth !== 'ALL') {
+      if (currentYearNum === selectedYear && currentMonthNum === selectedMonth) {
+        defaultDate = now.toISOString().split('T')[0];
+      } else {
+        defaultDate = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+      }
+    }
+
     setFormData({
       amount: '',
       source: '',
       income_type: 'Salary',
       payment_method: 'Bank Transfer',
-      income_date: new Date().toISOString().split('T')[0],
+      income_date: defaultDate,
       is_recurring: false,
       notes: ''
     });
@@ -131,6 +265,12 @@ const Income = () => {
         await api.put(`/income/${editingIncome.id}`, payload);
       } else {
         await api.post('/income/', payload);
+        // Switch to the month of the added income so user immediately sees it
+        const { year: addedY, month: addedM } = getIncomeDateParts(payload.income_date);
+        if (addedY && addedM && selectedMonth !== 'ALL') {
+          setSelectedYear(addedY);
+          setSelectedMonth(addedM);
+        }
       }
       invalidateCache('income');
       invalidateCache('dashboard');
@@ -142,65 +282,287 @@ const Income = () => {
     }
   };
 
-  const filteredIncomes = incomes.filter(inc => {
-    const matchesType = selectedType === 'All' || inc.income_type === selectedType;
-    const matchesSearch = inc.source.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (inc.payment_method && inc.payment_method.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (inc.notes && inc.notes.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchesType && matchesSearch;
-  });
+  // Filter incomes according to month, year, type, and search term
+  const filteredIncomes = useMemo(() => {
+    return incomes.filter(inc => {
+      // 1. Month & Year filter
+      if (selectedMonth !== 'ALL') {
+        const { year, month } = getIncomeDateParts(inc.income_date);
+        if (year !== selectedYear || month !== selectedMonth) {
+          return false;
+        }
+      }
+
+      // 2. Type filter
+      if (selectedType !== 'All' && inc.income_type !== selectedType) {
+        return false;
+      }
+
+      // 3. Search filter
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase();
+        const matchSource = inc.source?.toLowerCase().includes(term);
+        const matchMethod = inc.payment_method?.toLowerCase().includes(term);
+        const matchNotes = inc.notes?.toLowerCase().includes(term);
+        if (!matchSource && !matchMethod && !matchNotes) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [incomes, selectedMonth, selectedYear, selectedType, searchTerm]);
+
+  // Group filtered incomes by month for clear month-wise split
+  const monthGroups = useMemo(() => {
+    const groupsMap = new Map();
+
+    filteredIncomes.forEach(inc => {
+      const { year, month } = getIncomeDateParts(inc.income_date);
+      const key = `${year}-${String(month).padStart(2, '0')}`;
+      if (!groupsMap.has(key)) {
+        const mObj = months.find(m => m.value === month);
+        groupsMap.set(key, {
+          key,
+          year,
+          month,
+          title: `${mObj ? mObj.name : `Month ${month}`} ${year}`,
+          items: [],
+          total: 0
+        });
+      }
+      const grp = groupsMap.get(key);
+      grp.items.push(inc);
+      grp.total += Number(inc.amount) || 0;
+    });
+
+    return Array.from(groupsMap.values()).sort((a, b) => b.key.localeCompare(a.key));
+  }, [filteredIncomes]);
+
+  // KPI Calculations
+  const activeMonthLabel = useMemo(() => {
+    if (selectedMonth === 'ALL') {
+      return 'All Months Filtered';
+    }
+    const mObj = months.find(m => m.value === selectedMonth);
+    return `${mObj ? mObj.name : ''} ${selectedYear} Income`;
+  }, [selectedMonth, selectedYear]);
+
+  const activeMonthTotal = useMemo(() => {
+    if (selectedMonth === 'ALL') {
+      return filteredIncomes.reduce((sum, inc) => sum + (Number(inc.amount) || 0), 0);
+    }
+    return incomes
+      .filter(inc => {
+        const { year, month } = getIncomeDateParts(inc.income_date);
+        return year === selectedYear && month === selectedMonth;
+      })
+      .reduce((sum, inc) => sum + (Number(inc.amount) || 0), 0);
+  }, [incomes, filteredIncomes, selectedMonth, selectedYear]);
+
+  const activeMonthEntriesCount = useMemo(() => {
+    if (selectedMonth === 'ALL') {
+      return filteredIncomes.length;
+    }
+    return incomes.filter(inc => {
+      const { year, month } = getIncomeDateParts(inc.income_date);
+      return year === selectedYear && month === selectedMonth;
+    }).length;
+  }, [incomes, filteredIncomes, selectedMonth, selectedYear]);
+
+  const isCurrentCalendarMonth = selectedMonth === currentMonthNum && selectedYear === currentYearNum;
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+      {/* Top Header & Month Navigation Controls */}
+      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 sm:gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Income Management</h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Track your salary, freelance earnings, and multiple income streams.</p>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Track and split your salary, delivery earnings, and business revenue month by month.
+          </p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl shadow-xs hover:shadow transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          Add Income
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          {/* Month & Year Navigation Selector */}
+          <div className="flex items-center gap-1.5 bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs">
+            <button
+              onClick={handlePrevMonth}
+              disabled={selectedMonth === 'ALL'}
+              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+              title="Previous Month"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+
+            {/* Month Dropdown */}
+            <select
+              value={selectedMonth}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedMonth(val === 'ALL' ? 'ALL' : parseInt(val, 10));
+              }}
+              className="px-2.5 py-1.5 bg-transparent text-xs sm:text-sm font-bold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">📅 All Months (Split)</option>
+              {months.map(m => (
+                <option key={m.value} value={m.value}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Year Dropdown */}
+            {selectedMonth !== 'ALL' && (
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
+                className="px-2 py-1.5 bg-transparent text-xs sm:text-sm font-semibold text-slate-600 focus:outline-none cursor-pointer border-l border-slate-200"
+              >
+                {availableYears.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            )}
+
+            <button
+              onClick={handleNextMonth}
+              disabled={selectedMonth === 'ALL'}
+              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+              title="Next Month"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Quick jump to Current Month button if navigated away */}
+          {!isCurrentCalendarMonth && selectedMonth !== 'ALL' && (
+            <button
+              onClick={() => {
+                setSelectedMonth(currentMonthNum);
+                setSelectedYear(currentYearNum);
+              }}
+              className="px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold rounded-xl transition-all shadow-2xs"
+            >
+              This Month
+            </button>
+          )}
+
+          {/* Add Income Button */}
+          <button
+            onClick={openAddModal}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs hover:shadow transition-all ml-auto lg:ml-0"
+          >
+            <Plus className="h-4 w-4" />
+            Add Income
+          </button>
+        </div>
       </header>
+
+      {/* Quick Month Switcher Pills Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider whitespace-nowrap flex items-center gap-1 shrink-0">
+          <Calendar className="h-3.5 w-3.5 text-slate-400" /> Split By Month:
+        </span>
+
+        {/* All Months Pill */}
+        <button
+          onClick={() => setSelectedMonth('ALL')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all shadow-2xs flex items-center gap-1.5 ${
+            selectedMonth === 'ALL'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <span>All Months</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+            selectedMonth === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+          }`}>
+            {incomes.length}
+          </span>
+        </button>
+
+        {/* Dynamic Month Pills from data */}
+        {availableMonthOptions.map(mOpt => {
+          const isSelected = selectedMonth === mOpt.month && selectedYear === mOpt.year;
+          return (
+            <button
+              key={mOpt.key}
+              onClick={() => {
+                setSelectedMonth(mOpt.month);
+                setSelectedYear(mOpt.year);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all shadow-2xs flex items-center gap-1.5 ${
+                isSelected
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <span>{mOpt.name} {mOpt.year !== currentYearNum ? mOpt.year : ''}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+                isSelected ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+              }`}>
+                ₹{mOpt.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
-        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-100 flex items-center gap-3 sm:gap-4">
+        {/* Selected Month Income Card */}
+        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-100 flex items-center gap-3 sm:gap-4 relative overflow-hidden">
           <div className="p-2.5 sm:p-3 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
             <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
-          <div>
-            <p className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">This Month's Income</p>
-            <p className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-0.5 sm:mt-1">₹{summary.monthly_income.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider truncate">
+              {activeMonthLabel}
+            </p>
+            <p className="text-xl sm:text-2xl font-extrabold text-emerald-600 mt-0.5 sm:mt-1">
+              ₹{activeMonthTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {activeMonthEntriesCount} {activeMonthEntriesCount === 1 ? 'entry' : 'entries'}
+            </p>
           </div>
         </div>
 
+        {/* Total Income All-Time Card */}
         <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-100 flex items-center gap-3 sm:gap-4">
           <div className="p-2.5 sm:p-3 bg-blue-50 rounded-xl text-blue-600 shrink-0">
             <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Income (All-Time)</p>
-            <p className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-0.5 sm:mt-1">₹{summary.total_income.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+            <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Total Income (All-Time)</p>
+            <p className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-0.5 sm:mt-1">
+              ₹{summary.total_income.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {incomes.length} total records logged
+            </p>
           </div>
         </div>
 
+        {/* Recurring Monthly Card */}
         <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-100 flex items-center gap-3 sm:gap-4">
           <div className="p-2.5 sm:p-3 bg-purple-50 rounded-xl text-purple-600 shrink-0">
             <RefreshCw className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Recurring Monthly</p>
-            <p className="text-xl sm:text-2xl font-extrabold text-purple-600 mt-0.5 sm:mt-1">₹{summary.recurring_income.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+            <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Recurring Monthly</p>
+            <p className="text-xl sm:text-2xl font-extrabold text-purple-600 mt-0.5 sm:mt-1">
+              ₹{summary.recurring_income.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Fixed auto-recurring income</p>
           </div>
         </div>
       </div>
 
       {/* Main Content Table & Filters */}
       <div className="bg-white rounded-2xl shadow-xs border border-slate-100 overflow-hidden">
+        {/* Search & Category Filter Toolbar */}
         <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col md:flex-row gap-3 justify-between items-stretch md:items-center bg-slate-50/50">
           <div className="relative w-full md:w-72">
             <input
@@ -216,17 +578,19 @@ const Income = () => {
           <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 no-scrollbar">
             <button
               onClick={() => setSelectedType('All')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium shrink-0 transition-colors ${selectedType === 'All' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-colors ${
+                selectedType === 'All' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              }`}
             >
-              All ({incomes.length})
+              All Types ({filteredIncomes.length})
             </button>
             {incomeTypes.map(t => (
               <button
                 key={t}
                 onClick={() => setSelectedType(t)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${selectedType === t ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                  }`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                  selectedType === t ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
               >
                 {t}
               </button>
@@ -235,140 +599,181 @@ const Income = () => {
         </div>
 
         {loading ? (
-          <div className="p-10 text-center text-slate-500 text-sm">Loading your income records...</div>
+          <div className="p-12 text-center text-slate-500 text-sm">Loading income records...</div>
         ) : filteredIncomes.length === 0 ? (
-          <div className="p-10 text-center text-slate-400 text-sm">
-            No income entries found. Click "Add Income" to log your salary or earnings!
+          <div className="p-12 text-center flex flex-col items-center justify-center">
+            <div className="p-3 bg-slate-100 rounded-full text-slate-400 mb-3">
+              <Calendar className="h-6 w-6" />
+            </div>
+            <p className="text-slate-700 font-bold text-base">
+              No income entries found
+            </p>
+            <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-sm">
+              {selectedMonth !== 'ALL'
+                ? `No income entries recorded for ${months.find(m => m.value === selectedMonth)?.name || ''} ${selectedYear}.`
+                : 'No income entries found matching your search or filters.'}
+            </p>
+            <button
+              onClick={openAddModal}
+              className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-colors"
+            >
+              + Add Income for {selectedMonth !== 'ALL' ? `${months.find(m => m.value === selectedMonth)?.name || ''}` : 'this month'}
+            </button>
           </div>
         ) : (
-          <>
-            {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/75 text-slate-500 text-xs uppercase tracking-wider font-semibold">
-                    <th className="px-6 py-4">Date</th>
-                    <th className="px-6 py-4">Source</th>
-                    <th className="px-6 py-4">Type</th>
-                    <th className="px-6 py-4">Method</th>
-                    <th className="px-6 py-4">Recurring</th>
-                    <th className="px-6 py-4">Amount</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {filteredIncomes.map((income) => (
-                    <tr key={income.id} className="hover:bg-slate-50/75 transition-colors">
-                      <td className="px-6 py-4 text-slate-600 whitespace-nowrap">
-                        {new Date(income.income_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                      </td>
-                      <td className="px-6 py-4 font-medium text-slate-900">
-                        <div>{income.source}</div>
-                        {income.notes && <div className="text-xs text-slate-400 mt-0.5">{income.notes}</div>}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          {income.income_type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                          {income.payment_method || 'Bank Transfer'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {income.is_recurring ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100 font-medium">
-                            <RefreshCw className="h-3 w-3" /> Monthly
-                          </span>
-                        ) : (
-                          <span className="text-xs text-slate-400">One-time</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 font-bold text-emerald-600 text-base">
-                        +₹{income.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
-                        <button
-                          onClick={() => openEditModal(income)}
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(income.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Card Feed (Native App Feel) */}
-            <div className="md:hidden divide-y divide-slate-100">
-              {filteredIncomes.map((income) => (
-                <div key={income.id} className="p-3.5 flex flex-col gap-2 hover:bg-slate-50/50 transition-colors">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-slate-900 text-sm truncate">{income.source}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-400">
-                        <span>{new Date(income.income_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                        {income.notes && (
-                          <>
-                            <span>•</span>
-                            <span className="truncate">{income.notes}</span>
-                          </>
-                        )}
-                      </div>
+          <div className="divide-y divide-slate-100">
+            {monthGroups.map((group) => (
+              <div key={group.key} className="overflow-hidden">
+                {/* Month Group Section Header Banner */}
+                <div className="px-4 sm:px-6 py-3 bg-slate-50/90 border-y border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg">
+                      <Calendar className="h-4 w-4" />
                     </div>
-                    <div className="text-right shrink-0">
-                      <span className="font-extrabold text-emerald-600 text-sm sm:text-base">
-                        +₹{income.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
+                    <span className="font-bold text-slate-800 text-sm sm:text-base">
+                      {group.title}
+                    </span>
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-white text-slate-600 border border-slate-200 font-bold shadow-2xs">
+                      {group.items.length} {group.items.length === 1 ? 'entry' : 'entries'}
+                    </span>
                   </div>
-
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                        {income.income_type}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                        {income.payment_method || 'Bank Transfer'}
-                      </span>
-                      {income.is_recurring && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100 font-medium">
-                          <RefreshCw className="h-2.5 w-2.5" /> Recurring
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => openEditModal(income)}
-                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                        title="Edit"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(income.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                  <div className="text-right">
+                    <span className="text-xs text-slate-400 mr-2 font-medium hidden sm:inline">Monthly Subtotal:</span>
+                    <span className="font-extrabold text-emerald-600 text-sm sm:text-base">
+                      +₹{group.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50 text-slate-400 text-[11px] uppercase tracking-wider font-semibold border-b border-slate-100">
+                        <th className="px-6 py-3">Date</th>
+                        <th className="px-6 py-3">Source</th>
+                        <th className="px-6 py-3">Type</th>
+                        <th className="px-6 py-3">Method</th>
+                        <th className="px-6 py-3">Recurring</th>
+                        <th className="px-6 py-3">Amount</th>
+                        <th className="px-6 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-sm">
+                      {group.items.map((income) => (
+                        <tr key={income.id} className="hover:bg-slate-50/75 transition-colors">
+                          <td className="px-6 py-4 text-slate-600 whitespace-nowrap font-medium text-xs sm:text-sm">
+                            {formatDisplayDate(income.income_date)}
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-slate-900">
+                            <div>{income.source}</div>
+                            {income.notes && <div className="text-xs text-slate-400 font-normal mt-0.5">{income.notes}</div>}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                              {income.income_type}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                              {income.payment_method || 'Bank Transfer'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            {income.is_recurring ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-100 font-semibold">
+                                <RefreshCw className="h-3 w-3" /> Monthly
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400">One-time</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 font-extrabold text-emerald-600 text-base">
+                            +₹{income.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                            <button
+                              onClick={() => openEditModal(income)}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              title="Edit"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(income.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Feed View */}
+                <div className="md:hidden divide-y divide-slate-100">
+                  {group.items.map((income) => (
+                    <div key={income.id} className="p-3.5 flex flex-col gap-2 hover:bg-slate-50/50 transition-colors">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-900 text-sm truncate">{income.source}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-400">
+                            <span className="font-medium text-slate-600">{formatDisplayDate(income.income_date)}</span>
+                            {income.notes && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate">{income.notes}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-extrabold text-emerald-600 text-sm sm:text-base">
+                            +₹{income.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs pt-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            {income.income_type}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                            {income.payment_method || 'Bank Transfer'}
+                          </span>
+                          {income.is_recurring && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100 font-semibold">
+                              <RefreshCw className="h-2.5 w-2.5" /> Recurring
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => openEditModal(income)}
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(income.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
@@ -397,7 +802,7 @@ const Income = () => {
                   required
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm"
+                  className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm font-semibold"
                   placeholder="e.g. 50000"
                 />
               </div>
@@ -410,7 +815,7 @@ const Income = () => {
                   value={formData.source}
                   onChange={(e) => setFormData({ ...formData, source: e.target.value })}
                   className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm"
-                  placeholder="e.g. Tech Corp / Freelance Client"
+                  placeholder="e.g. Today Delivery Income or Tech Corp"
                 />
               </div>
 
@@ -468,7 +873,7 @@ const Income = () => {
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs sm:text-sm"
-                  placeholder="e.g. Performance bonus or project milestone"
+                  placeholder="e.g. Delivery tip, performance bonus, or client milestone"
                 />
               </div>
 
