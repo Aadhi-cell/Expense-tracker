@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { getCachedData, setCachedData, invalidateCache } from '../utils/cache';
@@ -8,82 +8,29 @@ import {
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, Wallet, PiggyBank, Plus,
-  ArrowUpRight, ArrowDownLeft, AlertTriangle, AlertCircle,
-  ChevronRight, ChevronLeft, Edit2, X, Trash2, Calendar,
-  Activity
+  ArrowUpRight, AlertTriangle, AlertCircle,
+  ChevronRight, Edit2, X, Trash2
 } from 'lucide-react';
 import MonthlyExpenseModal from '../components/MonthlyExpenseModal';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
 
 const Dashboard = () => {
-  const now = new Date();
-  const currentMonthNum = now.getMonth() + 1;
-  const currentYearNum = now.getFullYear();
-
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Month & Year Selector
-  const [selectedMonth, setSelectedMonth] = useState(currentMonthNum);
-  const [selectedYear, setSelectedYear] = useState(currentYearNum);
-
-  // Recent Activity Tab ('all', 'expenses', 'income')
-  const [activityTab, setActivityTab] = useState('all');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const months = [
-    { value: 1, name: 'January', short: 'Jan' },
-    { value: 2, name: 'February', short: 'Feb' },
-    { value: 3, name: 'March', short: 'Mar' },
-    { value: 4, name: 'April', short: 'Apr' },
-    { value: 5, name: 'May', short: 'May' },
-    { value: 6, name: 'June', short: 'Jun' },
-    { value: 7, name: 'July', short: 'Jul' },
-    { value: 8, name: 'August', short: 'Aug' },
-    { value: 9, name: 'September', short: 'Sep' },
-    { value: 10, name: 'October', short: 'Oct' },
-    { value: 11, name: 'November', short: 'Nov' },
-    { value: 12, name: 'December', short: 'Dec' }
+    { value: 1, name: 'January' }, { value: 2, name: 'February' },
+    { value: 3, name: 'March' }, { value: 4, name: 'April' },
+    { value: 5, name: 'May' }, { value: 6, name: 'June' },
+    { value: 7, name: 'July' }, { value: 8, name: 'August' },
+    { value: 9, name: 'September' }, { value: 10, name: 'October' },
+    { value: 11, name: 'November' }, { value: 12, name: 'December' }
   ];
-
-  // Quick Month Pills (Current month and past 4 months)
-  const quickMonthPills = useMemo(() => {
-    const pills = [];
-    for (let i = 0; i < 5; i++) {
-      const d = new Date(currentYearNum, currentMonthNum - 1 - i, 1);
-      const mVal = d.getMonth() + 1;
-      const yVal = d.getFullYear();
-      const mObj = months.find(m => m.value === mVal);
-      pills.push({
-        month: mVal,
-        year: yVal,
-        name: mObj ? mObj.name : `Month ${mVal}`,
-        label: `${mObj ? mObj.name : ''} ${yVal !== currentYearNum ? yVal : ''}`.trim()
-      });
-    }
-    return pills;
-  }, [currentMonthNum, currentYearNum]);
-
-  // Navigation handlers
-  const handlePrevMonth = () => {
-    if (selectedMonth === 1) {
-      setSelectedMonth(12);
-      setSelectedYear(prev => prev - 1);
-    } else {
-      setSelectedMonth(prev => prev - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (selectedMonth === 12) {
-      setSelectedMonth(1);
-      setSelectedYear(prev => prev + 1);
-    } else {
-      setSelectedMonth(prev => prev + 1);
-    }
-  };
-
-  const isCurrentCalendarMonth = selectedMonth === currentMonthNum && selectedYear === currentYearNum;
 
   // Savings Target Modal State
   const [isSavingsModalOpen, setIsSavingsModalOpen] = useState(false);
@@ -144,12 +91,14 @@ const Dashboard = () => {
     if (!window.confirm("Are you sure you want to remove the savings allocation for this month?")) return;
     try {
       setSavingTargetLoading(true);
+      // Use POST with target: 0 for 100% live compatibility across all backend deployment versions
       await api.post('/dashboard/savings-target', {
         target: 0,
         month: selectedMonth,
         year: selectedYear
       });
-      api.delete(`/dashboard/savings-target?month=${selectedMonth}&year=${selectedYear}`).catch(() => {});
+      // Fire-and-forget DELETE cleanup for newer backend builds
+      api.delete(`/dashboard/savings-target?month=${selectedMonth}&year=${selectedYear}`).catch(() => { });
       invalidateCache('dashboard');
       invalidateCache('monthly_expenses');
       setIsSavingsModalOpen(false);
@@ -162,66 +111,6 @@ const Dashboard = () => {
     }
   };
 
-  // Safe Date parsing helper without UTC shift
-  const formatTxDate = (dateStr) => {
-    if (!dateStr) return '';
-    const clean = String(dateStr).split('T')[0];
-    const [y, m, d] = clean.split('-').map(Number);
-    if (!y || !m || !d) return dateStr;
-    const monthShort = months.find(item => item.value === m)?.short || '';
-    return `${d} ${monthShort}`;
-  };
-
-  // Combined Cashflow Activity (Expenses + Incomes)
-  const combinedActivity = useMemo(() => {
-    if (!data) return [];
-    const list = [];
-
-    // Expenses
-    if (data.recent_transactions && Array.isArray(data.recent_transactions)) {
-      data.recent_transactions.forEach(tx => {
-        list.push({
-          id: `exp-${tx.id}`,
-          type: 'expense',
-          title: tx.description,
-          subtitle: `${tx.category}${tx.merchant ? ` • ${tx.merchant}` : ''}`,
-          date: tx.expense_date,
-          amount: Number(tx.amount) || 0,
-          badge: tx.category,
-          method: tx.payment_method
-        });
-      });
-    }
-
-    // Incomes
-    if (data.recent_incomes && Array.isArray(data.recent_incomes)) {
-      data.recent_incomes.forEach(inc => {
-        list.push({
-          id: `inc-${inc.id}`,
-          type: 'income',
-          title: inc.source,
-          subtitle: `${inc.income_type}${inc.notes ? ` • ${inc.notes}` : ''}`,
-          date: inc.income_date,
-          amount: Number(inc.amount) || 0,
-          badge: inc.income_type,
-          method: inc.payment_method
-        });
-      });
-    }
-
-    // Sort descending by date
-    return list.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  }, [data]);
-
-  const filteredActivity = useMemo(() => {
-    if (activityTab === 'expenses') {
-      return combinedActivity.filter(item => item.type === 'expense');
-    }
-    if (activityTab === 'income') {
-      return combinedActivity.filter(item => item.type === 'income');
-    }
-    return combinedActivity;
-  }, [combinedActivity, activityTab]);
 
   if (loading) {
     return (
@@ -257,87 +146,42 @@ const Dashboard = () => {
       { name: 'This Month', expenses: data.monthly_expenses, income: data.monthly_income, savings: data.savings_amount },
     ];
 
-  // Net Cashflow & Health Calculations
-  const netCashflow = (data.monthly_income || 0) - (data.monthly_expenses || 0);
-  const isPositiveCashflow = netCashflow >= 0;
-  const savingsRate = data.monthly_income > 0 
-    ? Math.max(0, Math.round((netCashflow / data.monthly_income) * 100))
-    : 0;
-
-  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-  const daysElapsed = isCurrentCalendarMonth ? Math.max(1, now.getDate()) : daysInMonth;
-  const dailyAvgSpend = (data.monthly_expenses || 0) / daysElapsed;
-
-  const selectedMonthObj = months.find(m => m.value === selectedMonth);
-
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header & Quick Navigation Controls */}
-      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 sm:gap-4">
+      {/* Header & Quick Actions */}
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Financial Dashboard</h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Real-time overview of your cashflow, savings, and budgets.</p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-          {/* Month & Year Navigation Selector */}
-          <div className="flex items-center gap-1.5 bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs">
-            <button
-              onClick={handlePrevMonth}
-              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
-              title="Previous Month"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          {/* Month / Year Selector */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <select
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
-              className="px-2.5 py-1.5 bg-transparent text-xs sm:text-sm font-bold text-slate-800 focus:outline-none cursor-pointer"
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+              className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-700 shadow-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               {months.map(m => (
                 <option key={m.value} value={m.value}>{m.name}</option>
               ))}
             </select>
-
             <select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
-              className="px-2 py-1.5 bg-transparent text-xs sm:text-sm font-semibold text-slate-600 focus:outline-none cursor-pointer border-l border-slate-200"
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-700 shadow-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               {[2024, 2025, 2026, 2027].map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
-
-            <button
-              onClick={handleNextMonth}
-              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
-              title="Next Month"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
           </div>
 
-          {/* Quick jump to Current Month button if navigated away */}
-          {!isCurrentCalendarMonth && (
-            <button
-              onClick={() => {
-                setSelectedMonth(currentMonthNum);
-                setSelectedYear(currentYearNum);
-              }}
-              className="px-3 py-2 bg-primary-50 text-primary-700 hover:bg-primary-100 border border-primary-200 text-xs font-bold rounded-xl transition-all shadow-2xs"
-            >
-              This Month
-            </button>
-          )}
-
-          {/* Add Income & Expense Buttons */}
-          <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto ml-auto lg:ml-0">
+          <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
             <Link
               to="/income"
               state={{ openModal: true }}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs sm:text-sm rounded-xl transition-colors text-center shadow-2xs"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs sm:text-sm rounded-xl transition-colors text-center"
             >
               <Plus className="h-4 w-4" />
               Add Income
@@ -353,32 +197,6 @@ const Dashboard = () => {
           </div>
         </div>
       </header>
-
-      {/* Quick Month Switcher Pills Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-        <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider whitespace-nowrap flex items-center gap-1 shrink-0">
-          <Calendar className="h-3.5 w-3.5 text-slate-400" /> Switch Month:
-        </span>
-        {quickMonthPills.map(p => {
-          const isSelected = selectedMonth === p.month && selectedYear === p.year;
-          return (
-            <button
-              key={`${p.year}-${p.month}`}
-              onClick={() => {
-                setSelectedMonth(p.month);
-                setSelectedYear(p.year);
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all shadow-2xs ${
-                isSelected
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              {p.label}
-            </button>
-          );
-        })}
-      </div>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
@@ -414,7 +232,7 @@ const Dashboard = () => {
             <p className="text-lg sm:text-2xl font-extrabold text-emerald-600 truncate">
               ₹{data.monthly_income.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
-            <p className="text-[10px] sm:text-xs text-slate-400 mt-1">Earned in {selectedMonthObj?.short}</p>
+            <p className="text-[10px] sm:text-xs text-slate-400 mt-1">Earned this month</p>
           </div>
         </div>
 
@@ -442,7 +260,7 @@ const Dashboard = () => {
               ₹{data.monthly_expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-[10px] sm:text-xs text-slate-400 mt-1 flex items-center justify-between">
-              <span>Spent in {selectedMonthObj?.short}</span>
+              <span>Spent this month</span>
               <span className="text-[10px] sm:text-[11px] text-amber-600 font-semibold group-hover:underline">Details →</span>
             </p>
           </div>
@@ -484,8 +302,8 @@ const Dashboard = () => {
               </p>
               {data.monthly_savings_target > 0 ? (
                 <span className={`text-[9px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full shrink-0 ${(data.this_month_savings !== undefined ? data.this_month_savings : data.savings_amount) >= data.monthly_savings_target
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-amber-50 text-amber-700'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-amber-50 text-amber-700'
                   }`}>
                   {(data.this_month_savings !== undefined ? data.this_month_savings : data.savings_amount) >= data.monthly_savings_target
                     ? '✓ Met'
@@ -515,53 +333,6 @@ const Dashboard = () => {
                 'No savings allocated this month'
               )}
             </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Financial Health & Cashflow Pulse Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className={`p-2.5 rounded-xl ${isPositiveCashflow ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
-            <Activity className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">
-                {selectedMonthObj?.name} {selectedYear} Cashflow Pulse
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                isPositiveCashflow ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-              }`}>
-                {isPositiveCashflow ? '✓ Net Surplus' : '⚠️ Deficit'}
-              </span>
-            </div>
-            <p className="text-lg sm:text-xl font-extrabold mt-0.5">
-              {isPositiveCashflow ? '+' : '-'}₹{Math.abs(netCashflow).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              <span className="text-xs font-normal text-slate-400 ml-2">net remaining after expenses</span>
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 border-t md:border-t-0 md:border-l border-slate-700/60 pt-3 md:pt-0 md:pl-4">
-          <div className="bg-white/5 rounded-xl px-3 py-1.5">
-            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Savings Rate</span>
-            <span className="text-sm sm:text-base font-bold text-emerald-400">{savingsRate}%</span>
-          </div>
-
-          <div className="bg-white/5 rounded-xl px-3 py-1.5">
-            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Daily Spend Avg</span>
-            <span className="text-sm sm:text-base font-bold text-slate-200">
-              ₹{Math.round(dailyAvgSpend).toLocaleString('en-IN')}
-              <span className="text-[10px] font-normal text-slate-400">/day</span>
-            </span>
-          </div>
-
-          <div className="bg-white/5 rounded-xl px-3 py-1.5 col-span-2 sm:col-span-1">
-            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Budget Health</span>
-            <span className="text-sm sm:text-base font-bold text-blue-400">
-              {data.budget_status?.filter(b => b.percentage_used <= 100).length || 0} / {data.budget_status?.length || 0} on track
-            </span>
           </div>
         </div>
       </div>
@@ -647,7 +418,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Bottom Row: Budget Status & Unified Recent Cashflow Activity */}
+      {/* Bottom Row: Budget Status & Recent Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Budget Status Warnings */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
@@ -721,89 +492,41 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Unified Recent Cashflow Activity (Expenses + Income) */}
-        <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+        {/* Recent Transactions */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
           <div>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+            <div className="flex justify-between items-center mb-4">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">Recent Cashflow Activity</h2>
-                <p className="text-xs text-slate-400">Live stream of money earned & spent</p>
+                <h2 className="text-lg font-bold text-slate-900">Recent Transactions</h2>
+                <p className="text-xs text-slate-400">Latest expense entries</p>
               </div>
-
-              {/* Activity Filter Tabs */}
-              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
-                <button
-                  onClick={() => setActivityTab('all')}
-                  className={`px-2.5 py-1 rounded-lg transition-colors ${
-                    activityTab === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setActivityTab('expenses')}
-                  className={`px-2.5 py-1 rounded-lg transition-colors ${
-                    activityTab === 'expenses' ? 'bg-white text-rose-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Expenses
-                </button>
-                <button
-                  onClick={() => setActivityTab('income')}
-                  className={`px-2.5 py-1 rounded-lg transition-colors ${
-                    activityTab === 'income' ? 'bg-white text-emerald-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Income
-                </button>
-              </div>
+              <Link to="/expenses" className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                View All <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
 
-            {filteredActivity.length > 0 ? (
+            {data.recent_transactions && data.recent_transactions.length > 0 ? (
               <div className="divide-y divide-slate-100">
-                {filteredActivity.slice(0, 7).map((item) => (
-                  <div key={item.id} className="py-2.5 flex justify-between items-center gap-2 hover:bg-slate-50/50 px-1 rounded-xl transition-colors">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`p-2 rounded-xl shrink-0 ${
-                        item.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-                      }`}>
-                        {item.type === 'income' ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-800 text-sm truncate">{item.title}</p>
-                        <p className="text-xs text-slate-400 truncate">
-                          {formatTxDate(item.date)} • <span className="font-medium text-slate-600">{item.badge}</span>
-                          {item.method && ` • ${item.method}`}
-                        </p>
-                      </div>
+                {data.recent_transactions.map((tx) => (
+                  <div key={tx.id} className="py-3 flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold text-slate-800 text-sm">{tx.description}</p>
+                      <p className="text-xs text-slate-400">
+                        {tx.category} • {new Date(tx.expense_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        {tx.merchant && ` • ${tx.merchant}`}
+                      </p>
                     </div>
-                    <div className="text-right shrink-0">
-                      <span className={`font-extrabold text-sm sm:text-base ${
-                        item.type === 'income' ? 'text-emerald-600' : 'text-slate-900'
-                      }`}>
-                        {item.type === 'income' ? '+' : '-'}₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
+                    <span className="font-bold text-slate-900 text-sm">
+                      -₹{tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="p-8 text-center text-slate-400 text-sm">
-                No recent activity recorded for this filter.
+                No recent transactions recorded.
               </div>
             )}
-          </div>
-
-          <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-            <span className="text-slate-400">{filteredActivity.length} recent entries</span>
-            <div className="flex items-center gap-3">
-              <Link to="/income" className="font-semibold text-emerald-600 hover:underline">
-                All Income →
-              </Link>
-              <Link to="/expenses" className="font-semibold text-primary-600 hover:underline">
-                All Expenses →
-              </Link>
-            </div>
           </div>
         </div>
       </div>
