@@ -117,10 +117,15 @@ def get_dashboard_summary(
     
     category_data = [{"category": cat, "amount": float(amount)} for cat, amount in category_expenses]
 
-    # Recent transactions
+    # Recent transactions (expenses)
     recent_transactions = db.query(Expense).filter(
         Expense.user_id == current_user.id
-    ).order_by(Expense.expense_date.desc(), Expense.id.desc()).limit(6).all()
+    ).order_by(Expense.expense_date.desc(), Expense.id.desc()).limit(8).all()
+
+    # Recent incomes
+    recent_incomes = db.query(Income).filter(
+        Income.user_id == current_user.id
+    ).order_by(Income.income_date.desc(), Income.id.desc()).limit(8).all()
 
     # Budget status with warning levels - calculated in memory to eliminate N database queries!
     budgets = db.query(Budget).filter(
@@ -212,6 +217,19 @@ def get_dashboard_summary(
         "savings_percentage": float(savings_percentage),
         "category_expenses": category_data,
         "recent_transactions": recent_transactions,
+        "recent_incomes": [
+            {
+                "id": inc.id,
+                "amount": float(inc.amount),
+                "source": inc.source,
+                "income_type": inc.income_type,
+                "payment_method": inc.payment_method,
+                "income_date": str(inc.income_date),
+                "is_recurring": inc.is_recurring,
+                "notes": inc.notes
+            }
+            for inc in recent_incomes
+        ],
         "budget_status": budget_status,
         "monthly_trends": monthly_trends,
         "selected_month": current_month,
