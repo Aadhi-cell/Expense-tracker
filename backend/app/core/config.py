@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     def SQLALCHEMY_DATABASE_URI(self) -> str:
         if self.DATABASE_URL:
             url = self.DATABASE_URL
+            if "-pooler." in url:
+                url = url.replace("-pooler.", ".")
             if url.startswith("postgres://"):
                 url = url.replace("postgres://", "postgresql+psycopg2://", 1)
             elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
