@@ -1,28 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, CheckCircle2 } from 'lucide-react';
+import { Zap, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const ColdStartBanner = () => {
-  const [status, setStatus] = useState('idle'); // 'idle' | 'waking' | 'ready'
+  const [status, setStatus] = useState('idle'); // 'idle' | 'waking' | 'ready' | 'error'
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
+    let dismissTimer = null;
+
     const handleWaking = () => {
+      if (dismissTimer) clearTimeout(dismissTimer);
       setStatus('waking');
     };
 
     const handleReady = () => {
+      if (dismissTimer) clearTimeout(dismissTimer);
       setStatus('ready');
-      const timer = setTimeout(() => {
+      dismissTimer = setTimeout(() => {
         setStatus('idle');
       }, 2000);
-      return () => clearTimeout(timer);
+    };
+
+    const handleError = (e) => {
+      if (dismissTimer) clearTimeout(dismissTimer);
+      setStatus('error');
+      setErrorMessage(e.detail?.message || 'Server connection failed.');
+      dismissTimer = setTimeout(() => {
+        setStatus('idle');
+      }, 4500);
     };
 
     window.addEventListener('backend-waking-up', handleWaking);
     window.addEventListener('backend-ready', handleReady);
+    window.addEventListener('backend-error', handleError);
 
     return () => {
+      if (dismissTimer) clearTimeout(dismissTimer);
       window.removeEventListener('backend-waking-up', handleWaking);
       window.removeEventListener('backend-ready', handleReady);
+      window.removeEventListener('backend-error', handleError);
     };
   }, []);
 
@@ -39,10 +55,15 @@ const ColdStartBanner = () => {
           <Zap className="w-4 h-4 text-amber-400 animate-bounce" />
           <span>Waking up cloud server (Render free tier)... Almost ready!</span>
         </div>
-      ) : (
+      ) : status === 'ready' ? (
         <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-950/90 text-emerald-200 backdrop-blur-md shadow-xl border border-emerald-500/30 text-xs sm:text-sm font-medium">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>Server online & ready! 🚀</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-rose-950/90 text-rose-200 backdrop-blur-md shadow-xl border border-rose-500/30 text-xs sm:text-sm font-medium">
+          <AlertTriangle className="w-4 h-4 text-rose-400" />
+          <span>{errorMessage || 'Server connection failed.'}</span>
         </div>
       )}
     </div>

@@ -9,7 +9,7 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet, PiggyBank, Plus,
   ArrowUpRight, AlertTriangle, AlertCircle,
-  ChevronRight, Edit2, X, Trash2
+  ChevronRight, Edit2, X, Trash2, RefreshCw
 } from 'lucide-react';
 import MonthlyExpenseModal from '../components/MonthlyExpenseModal';
 
@@ -18,6 +18,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 const Dashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Month & Year Selector
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -49,13 +50,22 @@ const Dashboard = () => {
     } else {
       setLoading(true);
     }
+    setError(null);
 
     try {
       const response = await api.get(`/dashboard/?month=${m}&year=${y}`);
       setData(response.data);
       setCachedData(cacheKey, response.data, 180);
-    } catch (error) {
-      console.error("Failed to fetch dashboard data", error);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to fetch dashboard data", err);
+      const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout');
+      setError({
+        isTimeout,
+        message: isTimeout
+          ? "Request timed out after 2 minutes. The cloud server may be spinning up or offline."
+          : (err.response?.data?.detail || "Failed to load dashboard data. Please check your backend connection.")
+      });
     } finally {
       setLoading(false);
     }
@@ -125,8 +135,38 @@ const Dashboard = () => {
 
   if (!data) {
     return (
-      <div className="p-8 text-center text-red-500 bg-red-50 rounded-2xl border border-red-100">
-        Failed to load financial dashboard. Please check your backend connection.
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-4 sm:p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-100">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-lg font-bold text-slate-800">
+              {error?.isTimeout ? "Connection Timed Out" : "Failed to Load Dashboard"}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+              {error?.message || "Could not retrieve your financial data from the backend server."}
+            </p>
+          </div>
+          <div className="pt-2 flex flex-col sm:flex-row gap-2 justify-center">
+            <button
+              onClick={() => fetchDashboard(selectedMonth, selectedYear)}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Try Again
+            </button>
+          </div>
+          {error?.isTimeout && (
+            <div className="text-[11px] text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100 text-left space-y-1.5">
+              <p className="font-semibold text-slate-700">Troubleshooting:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><strong>Cloud Tier (Render):</strong> Render free instances spin down after inactivity or if the database expired. Check your Render service status.</li>
+                <li><strong>Local Dev:</strong> If running locally, make sure your FastAPI backend is running via <code>uvicorn app.main:app --reload</code> on port 8000.</li>
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     );
   }

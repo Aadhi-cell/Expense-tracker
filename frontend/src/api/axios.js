@@ -74,7 +74,13 @@ api.interceptors.response.use(
       clearTimeout(slowRequestTimer);
       slowRequestTimer = null;
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('backend-ready'));
+        const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+        window.dispatchEvent(new CustomEvent('backend-error', {
+          detail: {
+            message: isTimeout ? 'Server request timed out. Backend may be offline or spinning down.' : 'Server connection error.',
+            isTimeout
+          }
+        }));
       }
     }
 
