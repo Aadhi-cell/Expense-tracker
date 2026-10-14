@@ -22,10 +22,12 @@ class Settings(BaseSettings):
         if self.DATABASE_URL:
             url = self.DATABASE_URL
             if url.startswith("postgres://"):
-                url = url.replace("postgres://", "postgresql://", 1)
+                url = url.replace("postgres://", "postgresql+psycopg2://", 1)
+            elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+                url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
             return url
         encoded_password = urllib.parse.quote_plus(self.POSTGRES_PASSWORD)
-        return f"postgresql://{self.POSTGRES_USER}:{encoded_password}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        return f"postgresql+psycopg2://{self.POSTGRES_USER}:{encoded_password}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
 
     class Config:
